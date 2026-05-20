@@ -147,6 +147,13 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
     chartRef.current = chart
     candleSeriesRef.current = series
 
+    const bloquearPinchZoomMovil = (e) => {
+      if (e.touches && e.touches.length > 1) {
+        e.preventDefault()
+      }
+    }
+    el.addEventListener('touchmove', bloquearPinchZoomMovil, { passive: false })
+
     chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
       if (!range) return
       if (range.from < 5 && allDataRef.current.length > 0) {
@@ -160,7 +167,11 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
       if (w > 0 && h > 0) chart.applyOptions({ width: w, height: h })
     })
     ro.observe(el)
-    return () => { ro.disconnect(); chart.remove() }
+    return () => {
+      el.removeEventListener('touchmove', bloquearPinchZoomMovil)
+      ro.disconnect()
+      chart.remove()
+    }
   }, [loadMore])
 
   useEffect(() => {

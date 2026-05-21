@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { getMe, logout } from './services/auth'
 import ChartContainer from './components/Chart/ChartContainer'
 import Toolbar from './components/Toolbar/Toolbar'
@@ -10,6 +10,7 @@ import Login from './components/Login'
 import Admin from './pages/Admin'
 
 function AppContent({ user, onLogout }) {
+  const location = useLocation()
   const [symbol, setSymbol] = useState('BTC')
   const [timeframe, setTimeframe] = useState('1D')
   const [indicators, setIndicators] = useState({
@@ -27,7 +28,7 @@ function AppContent({ user, onLogout }) {
       <header className="h-12 bg-surface border-b border-border flex items-center px-4 shrink-0">
         <Link to="/" className="text-lg font-semibold text-text hover:text-white mr-6">Trading App</Link>
         <div className="flex items-center gap-4 ml-auto">
-          {user?.role === 'admin' && (
+          {user?.role === 'admin' && location.pathname !== '/admin' && (
             <Link to="/admin" className="text-xs text-accent hover:underline">Admin</Link>
           )}
           <span className="text-xs text-text/60">{user?.username}</span>

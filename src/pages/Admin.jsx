@@ -37,7 +37,7 @@ export default function Admin() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [users, setUsers] = useState([])
-  const [form, setForm] = useState({ username: '', email: '', password: '', role: 'user' })
+  const [form, setForm] = useState({ username: '', password: '', role: 'user' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -66,7 +66,7 @@ export default function Admin() {
     try {
       await createUser(token, form)
       setSuccess('Usuario creado correctamente')
-      setForm({ username: '', email: '', password: '', role: 'user' })
+      setForm({ username: '', password: '', role: 'user' })
       fetchUsers()
     } catch (err) {
       setError(err.message)
@@ -96,8 +96,6 @@ export default function Admin() {
           <form onSubmit={handleCreate} className="flex flex-col gap-3">
             <input placeholder="Username" value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
               className="bg-bg border border-border rounded px-3 py-2 text-sm text-text" required />
-            <input type="email" placeholder="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className="bg-bg border border-border rounded px-3 py-2 text-sm text-text" required />
             <input type="password" placeholder="Password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               className="bg-bg border border-border rounded px-3 py-2 text-sm text-text" required />
             <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
@@ -118,7 +116,6 @@ export default function Admin() {
               <thead>
                 <tr className="border-b border-border text-left">
                   <th className="py-2 pr-4">Username</th>
-                  <th className="py-2 pr-4">Email</th>
                   <th className="py-2 pr-4">Rol</th>
                   <th className="py-2 pr-4">Creado</th>
                   <th className="py-2">Acción</th>
@@ -128,7 +125,6 @@ export default function Admin() {
                 {users.map(u => (
                   <tr key={u.id} className="border-b border-border/50 hover:bg-border/20">
                     <td className="py-2 pr-4 text-white">{u.username}</td>
-                    <td className="py-2 pr-4">{u.email}</td>
                     <td className="py-2 pr-4">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${u.role === 'admin' ? 'bg-accent/20 text-accent' : 'bg-border/40 text-text'}`}>
                         {u.role}

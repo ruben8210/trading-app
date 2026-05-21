@@ -1,7 +1,5 @@
 const isProd = import.meta.env.PROD
-const ALPACA_BASE = isProd
-  ? 'https://api.trading.rbonilla.com'
-  : 'http://localhost:8000'
+
 const YAHOO_BASE = isProd
   ? 'https://yahoo.trading.rbonilla.com/v8/finance/chart'
   : '/api/yahoo/v8/finance/chart'
@@ -199,14 +197,20 @@ async function fetchBinanceTicker(symbol) {
 }
 
 async function fetchYahooTicker(symbol) {
-  return cached(`alpaca:${symbol}`, async () => {
-    const res = await fetch(`${ALPACA_BASE}/api/v1/stocks/quote?ticker=${symbol}`)
+  return cached(`yahoo:${symbol}`, async () => {
+    const res = await fetch(`${YAHOO_BASE}/${symbol}?interval=1d&range=1d`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    })
     if (!res.ok) throw new Error(`Error ${res.status}: ${symbol}`)
     const json = await res.json()
-    return {
-      price: json.data.price,
-      changePercent: json.data.change_percent
-    }
+    const result = json.chart.result?.[0]
+    if (!result) throw new Error('Sin datos')
+    const meta = result.meta || {}
+    const price = meta.regularMarketPrice
+    const prevClose = meta.chartPreviousClose || meta.previousClose
+    if (price == null) throw new Error('Sin precio')
+    const changePercent = prevClose ? ((price - prevClose) / prevClose) * 100 : 0
+    return { price, changePercent }
   })
 }
 

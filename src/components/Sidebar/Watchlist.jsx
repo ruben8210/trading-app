@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { fetchTicker, isCrypto } from '../../services/api'
 
 const STORAGE_KEY = 'trading-watchlist'
 const VERSION_KEY = 'trading-watchlist-v'
 const LIST_VERSION = 2
 const DEFAULT_LIST = ['BTCUSDT', 'ETHUSDT', 'AAPL', 'TSLA', 'NVDA']
+const TWELVEDATA_TOKEN = import.meta.env.VITE_TWELVEDATA_TOKEN || ''
 
 function loadList() {
   try {
@@ -27,7 +28,6 @@ function formatPrice(price) {
 
 function WatchlistItem({ name, onSelect, price, change, dead }) {
   const isPos = change != null && change >= 0
-
   if (dead) {
     return (
       <div className="flex items-center justify-between w-full px-3 py-2 text-xs text-left">
@@ -36,7 +36,6 @@ function WatchlistItem({ name, onSelect, price, change, dead }) {
       </div>
     )
   }
-
   return (
     <button
       onClick={() => onSelect(name)}
@@ -87,10 +86,39 @@ function StockItem({ name, onSelect }) {
   return <WatchlistItem name={name} onSelect={onSelect} price={price} change={change} dead={dead} />
 }
 
+async function searchBinance(query) {
+  try {
+    const res = await fetch('https://api.binance.com/api/v3/exchangeInfo')
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.symbols
+      .filter(s => s.symbol.includes(query) && s.status === 'TRADING')
+      .slice(0, 5)
+      .map(s => ({ symbol: s.symbol, name: s.baseAsset, type: 'CRIPTO' }))
+  } catch { return [] }
+}
+
+async function searchTwelveData(query) {
+  try {
+    const res = await fetch(`https://api.twelvedata.com/symbol_search?symbol=${query}&apikey=${TWELVEDATA_TOKEN}`)
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.data || [])
+      .filter(s => s.instrument_type === 'Common Stock' || s.instrument_type === 'ETF')
+      .slice(0, 5)
+      .map(s => ({ symbol: s.symbol, name: s.instrument_name, type: s.instrument_type === 'ETF' ? 'ETF' : 'ACCION' }))
+  } catch { return [] }
+}
+
 export default function Watchlist({ onSelect }) {
   const [list, setList] = useState(loadList)
   const [input, setInput] = useState('')
   const [prices, setPrices] = useState({})
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const searchTimer = useRef(null)
+  const wrapperRef = useRef(null)
 
   const cryptos = list.filter(n => isCrypto(n))
   const stocks = list.filter(n => !isCrypto(n))
@@ -113,12 +141,38 @@ export default function Watchlist({ onSelect }) {
     return () => clearInterval(id)
   }, [list, cryptos.length])
 
-  const addSymbol = () => {
-    const s = input.trim().toUpperCase()
-    if (s && !list.includes(s)) {
-      setList(prev => [...prev, s])
-      setInput('')
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setShowSuggestions(false)
+      }
     }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleInput = useCallback((val) => {
+    setInput(val.toUpperCase())
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (val.length < 1) { setSuggestions([]); setShowSuggestions(false); return }
+    setSearching(true)
+    setShowSuggestions(true)
+    searchTimer.current = setTimeout(async () => {
+      const [cryptoResults, stockResults] = await Promise.all([
+        searchBinance(val.toUpperCase()),
+        searchTwelveData(val.toUpperCase())
+      ])
+      setSuggestions([...cryptoResults, ...stockResults])
+      setSearching(false)
+    }, 400)
+  }, [])
+
+  const addSymbol = (symbol) => {
+    const s = (symbol || input).trim().toUpperCase()
+    if (s && !list.includes(s)) setList(prev => [...prev, s])
+    setInput('')
+    setSuggestions([])
+    setShowSuggestions(false)
   }
 
   const removeSymbol = (e, name) => {
@@ -141,7 +195,7 @@ export default function Watchlist({ onSelect }) {
                 <div key={name} className="group relative">
                   <WatchlistItem name={name} onSelect={onSelect} price={p?.price} change={p?.change} />
                   <button onClick={e => removeSymbol(e, name)}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 text-border hover:text-red text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-border hover:text-red text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
                 </div>
               )
             })}
@@ -154,19 +208,45 @@ export default function Watchlist({ onSelect }) {
               <div key={name} className="group relative">
                 <StockItem name={name} onSelect={onSelect} />
                 <button onClick={e => removeSymbol(e, name)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 text-border hover:text-red text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-border hover:text-red text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div className="flex gap-1 p-2 border-t border-border">
-        <input value={input} onChange={e => setInput(e.target.value.toUpperCase())}
-          onKeyDown={e => e.key === 'Enter' && addSymbol()}
-          placeholder="Añadir..."
-          className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text placeholder:text-border" />
-        <button onClick={addSymbol}
-          className="px-2 py-1 bg-accent text-white rounded text-xs font-medium hover:opacity-90">+</button>
+      <div className="relative p-2 border-t border-border" ref={wrapperRef}>
+        <div className="flex gap-1">
+          <input
+            value={input}
+            onChange={e => handleInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addSymbol()}
+            onFocus={() => input.length > 0 && setShowSuggestions(true)}
+            placeholder="Buscar simbolo..."
+            className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text placeholder:text-border"
+          />
+          <button onClick={() => addSymbol()}
+            className="px-2 py-1 bg-accent text-white rounded text-xs font-medium hover:opacity-90">+</button>
+        </div>
+        {showSuggestions && (
+          <div className="absolute bottom-full left-2 right-2 mb-1 bg-surface border border-border rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+            {searching && (
+              <div className="px-3 py-2 text-xs text-text/50">Buscando...</div>
+            )}
+            {!searching && suggestions.length === 0 && input.length > 0 && (
+              <div className="px-3 py-2 text-xs text-text/50">Sin resultados — pulsa + para añadir igualmente</div>
+            )}
+            {suggestions.map((s, i) => (
+              <button key={i} onClick={() => addSymbol(s.symbol)}
+                className="flex items-center justify-between w-full px-3 py-2 text-xs hover:bg-border/40 text-left">
+                <div>
+                  <span className="text-white font-medium">{s.symbol}</span>
+                  <span className="text-text/50 ml-2 truncate max-w-[120px] inline-block align-bottom">{s.name}</span>
+                </div>
+                <span className="text-text/40 text-[10px]">{s.type}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

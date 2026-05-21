@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMe } from '../services/auth'
 
-const BASE = '/api/trading'
+const BASE = '/api/v1'
 
 async function getUsers(token) {
   const res = await fetch(`${BASE}/users`, {

@@ -96,12 +96,11 @@ function parseBinanceKlines(json) {
 // --- Initial fetch ---
 
 async function fetchYahooOHLCV(symbol, interval, rangeOverride, signal) {
-  const cfg = YAHOO_INITIAL[interval] || YAHOO_INITIAL['1D']
-  const range = rangeOverride ? RANGE_MAP[rangeOverride]?.yahoo || cfg.range : cfg.range
-  const url = `${YAHOO_BASE}/${symbol}?interval=${cfg.interval}&range=${range}&includePrePost=false`
-  const res = await fetch(url, { signal, headers: { 'User-Agent': 'Mozilla/5.0' } })
+  const url = `${ALPACA_BASE}/api/v1/stocks/bars?ticker=${symbol}&interval=${interval}`
+  const res = await fetch(url, { signal })
   if (!res.ok) throw new Error(`Error ${res.status}: ${symbol} no encontrado`)
-  return parseOHLC(await res.json())
+  const json = await res.json()
+  return json.data
 }
 
 async function fetchBinanceOHLCV(symbol, interval, rangeOverride, signal) {

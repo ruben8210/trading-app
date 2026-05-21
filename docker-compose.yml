@@ -1,0 +1,37 @@
+services:
+  trading-api:
+    image: python:3.13-slim
+    container_name: trading-api
+    restart: unless-stopped
+    working_dir: /app
+    command: bash -c "pip install -r requirements.txt -q && uvicorn main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /srv/trading-api:/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg://trading:trading123@trading-db/tradingdb
+    env_file:
+      - /srv/trading-api/.env
+    depends_on:
+      - trading-db
+    networks:
+      - web
+  trading-db:
+    image: postgres:15
+    container_name: trading-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=trading
+      - POSTGRES_PASSWORD=trading123
+      - POSTGRES_DB=tradingdb
+    volumes:
+      - trading-db-data:/var/lib/postgresql/data
+    networks:
+      - web
+volumes:
+  trading-db-data:
+networks:
+  web:
+    name: vaultwarden_web
+    external: true

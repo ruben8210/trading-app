@@ -1,0 +1,47 @@
+vault.rbonilla.com {
+    reverse_proxy vaultwarden:80
+}
+status.rbonilla.com {
+    reverse_proxy uptime-kuma:3001
+}
+links.rbonilla.com {
+    reverse_proxy linkding:9090
+}
+rss.rbonilla.com {
+    reverse_proxy miniflux:8080
+}
+pdf.rbonilla.com {
+    reverse_proxy stirling-pdf:8080
+}
+ia.rbonilla.com {
+    reverse_proxy 10.13.13.1:3000
+}
+trading.rbonilla.com {
+    handle /api/* {
+        reverse_proxy trading-api:8000
+    }
+    handle /auth/* {
+        reverse_proxy trading-api:8000
+    }
+    handle {
+        root * /srv/trading-frontend
+        file_server
+        try_files {path} /index.html
+    }
+}
+api.trading.rbonilla.com {
+    reverse_proxy trading-api:8000
+}
+yahoo.trading.rbonilla.com {
+    reverse_proxy https://query2.finance.yahoo.com {
+        header_up Host query2.finance.yahoo.com
+        header_up User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        header_up Accept "application/json,*/*"
+        header_up Accept-Language "es-ES,es;q=0.9"
+    }
+}
+binance.trading.rbonilla.com {
+    reverse_proxy https://api.binance.com {
+        header_up Host api.binance.com
+    }
+}

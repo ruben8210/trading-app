@@ -1,37 +1,24 @@
-"""Inicializa la base de datos y crea el usuario admin por defecto.
-
-Uso:
-    python init_db.py
-"""
-
-from database import Base, engine, SessionLocal
+import bcrypt
+import sys
+sys.path.insert(0, '/app')
+from database import SessionLocal, Base, engine
 from models import User
-from auth import hash_password
 
+Base.metadata.create_all(bind=engine)
 
-def init():
-    Base.metadata.create_all(bind=engine)
-    print("✅ Tablas creadas")
+db = SessionLocal()
 
-    db = SessionLocal()
-    try:
-        existing = db.query(User).filter(User.username == "admin").first()
-        if existing:
-            print("ℹ️  El usuario admin ya existe")
-            return
+# Crear usuario Ruben si no existe
+if not db.query(User).filter(User.username == 'Ruben').first():
+    user = User(
+        username='Ruben',
+        hashed_password=bcrypt.hashpw('ruben1643'.encode(), bcrypt.gensalt()).decode(),
+        role='admin'
+    )
+    db.add(user)
+    db.commit()
+    print("Usuario Ruben creado")
+else:
+    print("Usuario Ruben ya existe")
 
-        admin = User(
-            username="admin",
-            email="admin@tradingapp.com",
-            hashed_password=hash_password("admin123"),
-            role="admin",
-        )
-        db.add(admin)
-        db.commit()
-        print("✅ Usuario admin creado: admin / admin123")
-    finally:
-        db.close()
-
-
-if __name__ == "__main__":
-    init()
+db.close()

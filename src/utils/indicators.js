@@ -33,7 +33,12 @@ export function calculateRSI(data, period = 14) {
   }
   let avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period
   let avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period
-  const rsiValues = []
+
+  // Rellenar puntos iniciales con el primer valor válido para alinear con las velas
+  const firstRs = avgLoss === 0 ? 100 : avgGain / avgLoss
+  const firstVal = 100 - (100 / (1 + firstRs))
+  const rsiValues = data.slice(0, period).map(d => ({ time: d.time, value: firstVal }))
+
   for (let i = period; i < data.length; i++) {
     avgGain = (avgGain * (period - 1) + gains[i - 1]) / period
     avgLoss = (avgLoss * (period - 1) + losses[i - 1]) / period
@@ -59,7 +64,15 @@ export function calculateMACD(data, fastPeriod = 12, slowPeriod = 26, signalPeri
     time: d.time,
     value: d.value - signalLine[signalLine.length - alignedMacd.length + i].value
   }))
-  return { macdLine, signalLine, histogram }
+
+  // Rellenar inicio del histograma para alinear con las velas
+  const firstVal = histogram[0]?.value ?? 0
+  const fillerTimes = data
+    .filter(d => !signalTimes.has(d.time))
+    .map(d => ({ time: d.time, value: firstVal }))
+  const fullHistogram = [...fillerTimes, ...histogram]
+
+  return { macdLine, signalLine, histogram: fullHistogram }
 }
 
 export function calculateBollingerBands(data, period = 20, stdDev = 2) {

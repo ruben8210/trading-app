@@ -18,48 +18,76 @@ function AppContent({ user, onLogout }) {
     bollinger: false, sr: false,
   })
   const [indicatorPanelOpen, setIndicatorPanelOpen] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
 
   const handleIndicatorToggle = (key) => {
     setIndicators(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+      setFullscreen(true)
+    } else {
+      document.exitFullscreen().catch(() => {})
+      setFullscreen(false)
+    }
+  }
+
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) setFullscreen(false)
+    }
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
   return (
     <div className="h-screen flex flex-col">
-      <header className="h-12 bg-surface border-b border-border flex items-center px-4 shrink-0">
-        <Link to="/" className="text-lg font-semibold text-text hover:text-white mr-6">Trading App</Link>
+      <header className={`h-12 bg-surface border-b border-border flex items-center px-4 shrink-0 ${fullscreen ? 'hidden' : ''}`}>
+        <Link to="/" className="text-lg font-semibold text-text hover:text-white mr-4">Trading App</Link>
+        <AssetInfo symbol={symbol} />
         <div className="flex items-center gap-4 ml-auto">
+          <button onClick={toggleFullscreen} title="Pantalla completa"
+            className="text-text/60 hover:text-white text-sm px-1">⛶</button>
           {user?.role === 'admin' && location.pathname !== '/admin' && (
             <Link to="/admin" className="text-xs text-accent hover:underline">Admin</Link>
           )}
-          <span className="text-xs text-text/60">{user?.username}</span>
           <button onClick={onLogout} className="text-xs text-text hover:text-white">Salir</button>
         </div>
       </header>
-
       <Routes>
         <Route path="/" element={
           <>
-            <Toolbar
-              symbol={symbol}
-              onSymbolChange={setSymbol}
-              timeframe={timeframe}
-              onTimeframeChange={setTimeframe}
-              indicators={indicators}
-              onIndicatorToggle={handleIndicatorToggle}
-              onOpenIndicators={() => setIndicatorPanelOpen(true)}
-            />
+            <div className={fullscreen ? 'hidden' : ''}>
+              <Toolbar
+                symbol={symbol}
+                onSymbolChange={setSymbol}
+                timeframe={timeframe}
+                onTimeframeChange={setTimeframe}
+                indicators={indicators}
+                onIndicatorToggle={handleIndicatorToggle}
+                onOpenIndicators={() => setIndicatorPanelOpen(true)}
+              />
+            </div>
             <main className="flex-1 flex min-h-0 relative">
-              <Watchlist onSelect={setSymbol} />
+              <div className={fullscreen ? 'hidden' : ''}>
+                <Watchlist onSelect={setSymbol} />
+              </div>
               <div className="flex-1 flex flex-col min-h-0">
+                {fullscreen && (
+                  <button onClick={toggleFullscreen}
+                    className="absolute top-2 right-2 z-50 text-text/40 hover:text-white text-xs bg-surface/80 px-2 py-1 rounded">
+                    ✕ Salir
+                  </button>
+                )}
                 <ChartContainer symbol={symbol} timeframe={timeframe} indicators={indicators} />
               </div>
-              <AssetInfo symbol={symbol} />
             </main>
           </>
         } />
         <Route path="/admin" element={<Admin />} />
       </Routes>
-
       {indicatorPanelOpen && (
         <IndicatorPanel
           indicators={indicators}

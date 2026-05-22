@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchTicker, isCrypto } from '../../services/api'
 
 export default function AssetInfo({ symbol }) {
@@ -30,28 +30,19 @@ export default function AssetInfo({ symbol }) {
   const decimals = displayPrice >= 1000 ? 2 : displayPrice >= 1 ? 4 : 6
 
   return (
-    <div className="bg-surface border-l border-border p-4 flex flex-col gap-4">
-      <div>
-        <div className="text-text text-xs uppercase tracking-wider mb-1">Símbolo</div>
-        <div className="text-white font-bold text-lg">{symbol}</div>
-      </div>
-      <div>
-        <div className="text-text text-xs uppercase tracking-wider mb-1">Precio</div>
-        <div className="text-white font-mono text-base">
-          {displayPrice != null
-            ? `${displayPrice.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ${currencyLabel}`
-            : '—'}
-        </div>
-      </div>
+    <div className="flex items-center gap-3 px-3 border-l border-border ml-2">
+      <span className="text-white font-bold text-sm">{symbol}</span>
+      <span className="text-white font-mono text-sm">
+        {displayPrice != null
+          ? `${displayPrice.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} ${currencyLabel}`
+          : '—'}
+      </span>
       {eurRate && (
         <button onClick={() => setCurrency(c => c === 'USDT' ? 'EUR' : 'USDT')}
-          className="text-xs text-accent hover:underline self-start">
-          Mostrar en {currency === 'USDT' ? 'EUR' : 'USDT'}
+          className="text-xs text-accent hover:underline">
+          {currency === 'USDT' ? 'EUR' : 'USDT'}
         </button>
       )}
-      <div className="text-text text-xs mt-auto">
-        {isCoin ? 'Cada 5 seg.' : 'Cada 30 seg.'}
-      </div>
     </div>
   )
 }

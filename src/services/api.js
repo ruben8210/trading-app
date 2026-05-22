@@ -1,6 +1,6 @@
 const isProd = import.meta.env.PROD
 const ALPACA_BASE = isProd
-  ? 'https://api.trading.rbonilla.com'
+  ? 'https://api.trading.rbonilla.com/api/v1'
   : 'http://localhost:8000'
 const YAHOO_BASE = isProd
   ? 'https://yahoo.trading.rbonilla.com/v8/finance/chart'

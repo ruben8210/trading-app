@@ -6,11 +6,11 @@ from sqlalchemy.orm import Session
 
 load_dotenv()
 
-from database import get_db, Base, engine
-from models import User
-from schemas import LoginRequest, TokenResponse, UserMe
-from auth import verify_password, create_access_token, get_current_user
-from routes import users, preferences, stocks
+from trading_api.database import get_db, Base, engine
+from trading_api.models import User
+from trading_api.schemas import LoginRequest, TokenResponse, UserMe
+from trading_api.auth import verify_password, create_access_token, get_current_user
+from trading_api.routes import users, preferences, stocks, orders
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,7 +18,7 @@ app = FastAPI(title="Trading API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://trading.rbonilla.com","http://192.168.1.225:5173"],
+    allow_origins=["https://trading.rbonilla.com","http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,14 +27,11 @@ app.add_middleware(
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
 app.include_router(stocks.router, prefix="/api/v1")
-
+app.include_router(orders.router)
 
 @app.get("/")
 def root():
     return {"message": "Trading API funcionando"}
-
-
-# ─── Auth endpoints ────────────────────────────────────────────
 
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -44,11 +41,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token({"sub": user.id})
     return TokenResponse(access_token=token)
 
-
 @app.post("/auth/logout")
 def logout():
     return {"message": "Sesión cerrada"}
-
 
 @app.get("/auth/me", response_model=UserMe)
 def me(current_user: User = Depends(get_current_user)):

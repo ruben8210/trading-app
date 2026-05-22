@@ -6,6 +6,8 @@ import Toolbar from './components/Toolbar/Toolbar'
 import AssetInfo from './components/Sidebar/AssetInfo'
 import Watchlist from './components/Sidebar/Watchlist'
 import IndicatorPanel from './components/Indicators/IndicatorPanel'
+import OrdersPanel from './components/Orders/OrdersPanel'
+import AlertsPanel from './components/Orders/AlertsPanel'
 import Login from './components/Login'
 import Admin from './pages/Admin'
 
@@ -19,6 +21,7 @@ function AppContent({ user, onLogout }) {
   })
   const [indicatorPanelOpen, setIndicatorPanelOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const [rightPanelTab, setRightPanelTab] = useState('orders')
 
   const handleIndicatorToggle = (key) => {
     setIndicators(prev => ({ ...prev, [key]: !prev[key] }))
@@ -43,37 +46,40 @@ function AppContent({ user, onLogout }) {
   }, [])
 
   return (
-    <div className="h-screen flex flex-col">
-      <header className={`h-12 bg-surface border-b border-border flex items-center px-4 shrink-0 ${fullscreen ? 'hidden' : ''}`}>
-        <Link to="/" className="text-lg font-semibold text-text hover:text-white mr-4">Trading App</Link>
+    <div className="h-screen flex flex-col bg-bg">
+      <header className={`h-14 bg-surface border-b border-border flex items-center px-4 shrink-0 ${fullscreen ? 'hidden' : ''}`}>
+        <Link to="/" className="text-lg font-bold text-white hover:text-accent mr-6">
+          📈 Trading
+        </Link>
         <AssetInfo symbol={symbol} />
         <div className="flex items-center gap-4 ml-auto">
           <button onClick={toggleFullscreen} title="Pantalla completa"
-            className="text-text/60 hover:text-white text-sm px-1">⛶</button>
+            className="text-text/60 hover:text-white text-lg px-2 transition">⛶</button>
           {user?.role === 'admin' && location.pathname !== '/admin' && (
-            <Link to="/admin" className="text-xs text-accent hover:underline">Admin</Link>
+            <Link to="/admin" className="text-xs text-accent hover:text-accent/80 font-medium">Admin</Link>
           )}
-          <button onClick={onLogout} className="text-xs text-text hover:text-white">Salir</button>
+          <button onClick={onLogout} className="text-xs text-text/60 hover:text-text">Salir</button>
         </div>
       </header>
+
       <Routes>
         <Route path="/" element={
           <>
-            <div className={fullscreen ? 'hidden' : ''}>
-              <Toolbar
-                symbol={symbol}
-                onSymbolChange={setSymbol}
-                timeframe={timeframe}
-                onTimeframeChange={setTimeframe}
-                indicators={indicators}
-                onIndicatorToggle={handleIndicatorToggle}
-                onOpenIndicators={() => setIndicatorPanelOpen(true)}
-              />
-            </div>
+            {!fullscreen && <Toolbar
+              symbol={symbol}
+              onSymbolChange={setSymbol}
+              timeframe={timeframe}
+              onTimeframeChange={setTimeframe}
+              indicators={indicators}
+              onIndicatorToggle={handleIndicatorToggle}
+              onOpenIndicators={() => setIndicatorPanelOpen(true)}
+            />}
             <main className="flex-1 flex min-h-0 relative">
-              <div className={fullscreen ? 'hidden' : ''}>
-                <Watchlist onSelect={setSymbol} />
-              </div>
+              {!fullscreen && (
+                <div className="w-48 border-r border-border overflow-y-auto">
+                  <Watchlist onSelect={setSymbol} />
+                </div>
+              )}
               <div className="flex-1 flex flex-col min-h-0">
                 {fullscreen && (
                   <button onClick={toggleFullscreen}
@@ -83,11 +89,42 @@ function AppContent({ user, onLogout }) {
                 )}
                 <ChartContainer symbol={symbol} timeframe={timeframe} indicators={indicators} />
               </div>
+              {!fullscreen && (
+                <div className="w-72 border-l border-border flex flex-col">
+                  <div className="flex border-b border-border">
+                    <button
+                      onClick={() => setRightPanelTab('orders')}
+                      className={`flex-1 py-2 text-xs font-medium transition ${
+                        rightPanelTab === 'orders'
+                          ? 'bg-accent text-white'
+                          : 'bg-surface text-text/60 hover:text-text'
+                      }`}
+                    >
+                      Órdenes
+                    </button>
+                    <button
+                      onClick={() => setRightPanelTab('alerts')}
+                      className={`flex-1 py-2 text-xs font-medium transition ${
+                        rightPanelTab === 'alerts'
+                          ? 'bg-accent text-white'
+                          : 'bg-surface text-text/60 hover:text-text'
+                      }`}
+                    >
+                      Alertas
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    {rightPanelTab === 'orders' && <OrdersPanel symbol={symbol} />}
+                    {rightPanelTab === 'alerts' && <AlertsPanel symbol={symbol} />}
+                  </div>
+                </div>
+              )}
             </main>
           </>
         } />
         <Route path="/admin" element={<Admin />} />
       </Routes>
+
       {indicatorPanelOpen && (
         <IndicatorPanel
           indicators={indicators}
@@ -116,7 +153,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-bg">
-        <span className="text-text">Cargando...</span>
+        <span className="text-text animate-pulse">Cargando...</span>
       </div>
     )
   }

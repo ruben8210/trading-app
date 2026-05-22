@@ -2,25 +2,36 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 async function searchYahoo(query) {
   const q = encodeURIComponent(query)
-  console.log('buscando:', query)
   const res = await fetch(`/api/search/v1/finance/search?q=${q}&quotesCount=8&newsCount=0`)
-  if (!res.ok) { console.log('error fetch:', res.status); return [] }
+  if (!res.ok) return []
   const json = await res.json()
   return (json.quotes || [])
     .filter(q => q.symbol && !q.symbol.includes('='))
     .slice(0, 8)
-    .map(q => ({
-      symbol: q.symbol,
-      name: q.shortname || q.longname || '',
-      type: q.quoteType || '',
-    }))
+    .map(q => ({ symbol: q.symbol, name: q.shortname || q.longname || '', type: q.quoteType || '' }))
+}
+
+const TIMEFRAME_GROUPS = [
+  { label: 'MINUTOS', options: ['1m', '5m', '15m', '30m'] },
+  { label: 'HORAS',   options: ['1h', '2h', '4h'] },
+  { label: 'DÍAS',    options: ['1D'] },
+  { label: 'SEMANAS', options: ['1W'] },
+  { label: 'MESES',   options: ['1M'] },
+]
+
+const TF_LABELS = {
+  '1m':'1m','5m':'5m','15m':'15m','30m':'30m',
+  '1h':'1h','2h':'2h','4h':'4h',
+  '1D':'1D','1W':'1S','1M':'1M'
 }
 
 export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframeChange, indicators, onIndicatorToggle, onOpenIndicators }) {
   const [query, setQuery] = useState(symbol)
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
+  const [tfOpen, setTfOpen] = useState(false)
   const wrapperRef = useRef(null)
+  const tfWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -29,6 +40,7 @@ export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframe
   useEffect(() => {
     const handler = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false)
+      if (tfWrapperRef.current && !tfWrapperRef.current.contains(e.target)) setTfOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -59,7 +71,11 @@ export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframe
     setOpen(false)
   }
 
-  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1D', '1W', '1M']
+  const selectTimeframe = (tf) => {
+    onTimeframeChange(tf)
+    setTfOpen(false)
+  }
+
   const activeCount = Object.values(indicators).filter(Boolean).length
 
   return (
@@ -95,14 +111,32 @@ export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframe
         )}
       </div>
       <div className="h-5 w-px bg-border" />
-      <div className="flex gap-1">
-        {timeframes.map(tf => (
-          <button key={tf} onClick={() => onTimeframeChange(tf)}
-            className={`px-2 py-1 rounded text-xs font-medium transition-colors
-              ${timeframe === tf ? 'bg-accent text-white' : 'text-text hover:bg-border'}`}>
-            {tf}
-          </button>
-        ))}
+      <div ref={tfWrapperRef} className="relative">
+        <button
+          onClick={() => setTfOpen(o => !o)}
+          className="flex items-center gap-1 px-3 py-1 rounded text-xs font-medium bg-accent text-white hover:opacity-90"
+        >
+          {TF_LABELS[timeframe] || timeframe}
+          <span className="text-[10px] opacity-70">▼</span>
+        </button>
+        {tfOpen && (
+          <div className="absolute top-full left-0 mt-1 w-40 bg-[#1e222d] border border-border rounded shadow-lg z-50 overflow-y-auto max-h-80">
+            {TIMEFRAME_GROUPS.map(group => (
+              <div key={group.label}>
+                <div className="px-3 py-1.5 text-[10px] text-text/40 font-semibold uppercase tracking-wider border-b border-border/40">
+                  {group.label}
+                </div>
+                {group.options.map(tf => (
+                  <button key={tf} onClick={() => selectTimeframe(tf)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-border/20 transition-colors
+                      ${timeframe === tf ? 'text-accent font-semibold' : 'text-text'}`}>
+                    {TF_LABELS[tf]}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="h-5 w-px bg-border" />
       <button onClick={onOpenIndicators}

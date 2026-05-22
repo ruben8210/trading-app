@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from database import get_db
-from models import User
-from schemas import UserCreate, UserOut
-from auth import hash_password, require_admin
+from trading_api.database import get_db
+from trading_api.models import User
+from trading_api.schemas import UserCreate, UserOut
+from trading_api.auth import hash_password, require_admin
 
 router = APIRouter(prefix="/users", tags=["users"])
 

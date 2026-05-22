@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, func
-from database import Base
+from trading_api.database import Base
 
 
 class User(Base):

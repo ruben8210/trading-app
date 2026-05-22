@@ -2,10 +2,10 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import User, UserPreference
-from schemas import PreferenceData, PreferenceOut
-from auth import get_current_user
+from trading_api.database import get_db
+from trading_api.models import User, UserPreference
+from trading_api.schemas import PreferenceData, PreferenceOut
+from trading_api.auth import get_current_user
 
 router = APIRouter(prefix="/preferences", tags=["preferences"])
 

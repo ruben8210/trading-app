@@ -1,37 +1,82 @@
 const API_BASE = "http://127.0.0.1:8000/api/v1";
 
+const handleFetchError = (error, context) => {
+  const message = error?.message || 'Error desconocido';
+  console.error(`${context}:`, error);
+  throw new Error(`${context}: ${message}`);
+};
+
 export const fetchTicker = async (symbol) => {
+  if (!symbol || typeof symbol !== 'string') {
+    throw new Error('Symbol debe ser una cadena válida');
+  }
+
   try {
-    const isCrypto = symbol.toUpperCase().endsWith("USDT") || ["BTC", "ETH"].includes(symbol.toUpperCase());
-    
+    const cryptoSymbol = symbol.toUpperCase();
+    const isCrypto = cryptoSymbol.endsWith("USDT") || ["BTC", "ETH"].includes(cryptoSymbol);
+
+    const url = isCrypto
+      ? `${API_BASE}/proxy/binance/ticker/${cryptoSymbol}`
+      : `${API_BASE}/proxy/finnhub/quote/${cryptoSymbol}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data) {
+      throw new Error('Respuesta vacía del servidor');
+    }
+
     if (isCrypto) {
-      const response = await fetch(`${API_BASE}/proxy/binance/ticker/${symbol}`);
-      const data = await response.json();
-      return data;
-    } else {
-      const response = await fetch(`${API_BASE}/proxy/finnhub/quote/${symbol}`);
-      const data = await response.json();
       return {
-        symbol: data.symbol,
-        price: data.price,
-        change: data.change,
-        changePercent: data.changePercent,
+        symbol: data.symbol || cryptoSymbol,
+        price: data.price ?? null,
+        change: data.change ?? 0,
+        changePercent: data.changePercent ?? 0,
       };
     }
+
+    return {
+      symbol: data.symbol || cryptoSymbol,
+      price: data.price ?? null,
+      change: data.change ?? 0,
+      changePercent: data.changePercent ?? 0,
+    };
   } catch (error) {
-    console.error("Error fetching ticker:", error);
-    throw error;
+    handleFetchError(error, `Error al obtener ticker para ${symbol}`);
   }
 };
 
-export const fetchBars = async (symbol, interval = "1d") => {
+export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
+  if (!symbol || typeof symbol !== 'string') {
+    throw new Error('Symbol debe ser una cadena válida');
+  }
+  if (!interval || typeof interval !== 'string') {
+    throw new Error('Interval debe ser una cadena válida');
+  }
+
   try {
-    const response = await fetch(`${API_BASE}/proxy/binance/klines/${symbol}?interval=${interval}&limit=100`);
+    const url = `${API_BASE}/proxy/binance/klines/${symbol}?interval=${interval}&limit=${Math.min(Math.max(limit, 1), 1000)}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     const data = await response.json();
-    return data.candles || [];
+
+    if (!Array.isArray(data?.candles)) {
+      console.warn(`No se encontraron candles para ${symbol} en intervalo ${interval}`);
+      return [];
+    }
+
+    return data.candles;
   } catch (error) {
-    console.error("Error fetching bars:", error);
-    throw error;
+    handleFetchError(error, `Error al obtener barras para ${symbol}`);
   }
 };
 
@@ -40,26 +85,49 @@ export const isCrypto = (symbol) => {
 };
 
 export const fetchOHLCV = async (symbol, interval = "1d") => {
-  return fetchBars(symbol, interval);
+  return fetchBars(symbol, interval, 100);
 };
 
-export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100) => {
+export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100, beforeTime = null) => {
+  if (!symbol || typeof symbol !== 'string') {
+    throw new Error('Symbol debe ser una cadena válida');
+  }
+
   try {
-    const response = await fetch(`${API_BASE}/proxy/binance/klines/${symbol}?interval=${interval}&limit=${limit}`);
+    const params = new URLSearchParams({
+      interval: interval || '1d',
+      limit: Math.min(Math.max(limit, 1), 1000),
+    });
+
+    if (beforeTime) {
+      params.append('before', beforeTime);
+    }
+
+    const url = `${API_BASE}/proxy/binance/klines/${symbol}?${params}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     const data = await response.json();
-    return data.candles || [];
+
+    if (!Array.isArray(data?.candles)) {
+      return [];
+    }
+
+    return data.candles;
   } catch (error) {
-    console.error("Error fetching more OHLCV:", error);
-    throw error;
+    handleFetchError(error, `Error al obtener más datos para ${symbol}`);
   }
 };
 
 export const fetchLatestCandle = async (symbol, interval = "1d") => {
   try {
-    const candles = await fetchBars(symbol, interval);
-    return candles[candles.length - 1] || null;
+    const candles = await fetchBars(symbol, interval, 1);
+    return candles?.[0] ?? null;
   } catch (error) {
-    console.error("Error fetching latest candle:", error);
-    throw error;
+    console.warn(`No se pudo obtener la vela más reciente para ${symbol}:`, error.message);
+    return null;
   }
 };

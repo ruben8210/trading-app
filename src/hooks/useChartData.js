@@ -51,7 +51,7 @@ export function useChartData(symbol, interval, chartRange) {
     if (!sym || !iv || rng) return
     if (!oldestRef.current) return
     try {
-      const older = await fetchMoreOHLCV(sym, iv, oldestRef.current)
+      const older = await fetchMoreOHLCV(sym, iv, 100, oldestRef.current)
       if (older.length === 0) return
       oldestRef.current = older[0].time
       setData(prev => [...older, ...prev])

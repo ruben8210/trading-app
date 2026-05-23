@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export default function AlertsPanel({ symbol }) {
   const [alerts, setAlerts] = useState([])
@@ -6,23 +6,23 @@ export default function AlertsPanel({ symbol }) {
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
 
-  useEffect(() => {
-    loadAlerts()
-    const interval = setInterval(loadAlerts, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async () => {
     try {
       const res = await fetch(`/api/v1/alerts`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setAlerts(data.filter(a => a.symbol === symbol.toUpperCase()))
       }
-    } catch (err) {
-      console.error('Error loading alerts:', err)
+    } catch (error) {
+      console.error('Error loading alerts:', error)
     }
-  }
+  }, [symbol])
+
+  useEffect(() => {
+    loadAlerts()
+    const interval = setInterval(loadAlerts, 5000)
+    return () => clearInterval(interval)
+  }, [loadAlerts])
 
   const handleCreateAlert = async () => {
     if (!formData.price) {
@@ -47,7 +47,7 @@ export default function AlertsPanel({ symbol }) {
         setShowForm(false)
         loadAlerts()
       }
-    } catch (err) {
+    } catch {
       alert('Error creando alerta')
     } finally {
       setLoading(false)
@@ -61,7 +61,7 @@ export default function AlertsPanel({ symbol }) {
         credentials: 'include'
       })
       loadAlerts()
-    } catch (err) {
+    } catch {
       alert('Error eliminando alerta')
     }
   }

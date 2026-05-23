@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export default function OrdersPanel({ symbol }) {
   const [orders, setOrders] = useState([])
@@ -6,23 +6,23 @@ export default function OrdersPanel({ symbol }) {
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
 
-  useEffect(() => {
-    loadOrders()
-    const interval = setInterval(loadOrders, 5000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       const res = await fetch(`/api/v1/orders`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setOrders(data.filter(o => o.symbol === symbol.toUpperCase()))
       }
-    } catch (err) {
-      console.error('Error loading orders:', err)
+    } catch (error) {
+      console.error('Error loading orders:', error)
     }
-  }
+  }, [symbol])
+
+  useEffect(() => {
+    loadOrders()
+    const interval = setInterval(loadOrders, 5000)
+    return () => clearInterval(interval)
+  }, [loadOrders])
 
   const handleCreateOrder = async () => {
     if (!formData.entryPrice || !formData.quantity) {
@@ -48,7 +48,7 @@ export default function OrdersPanel({ symbol }) {
         setShowForm(false)
         loadOrders()
       }
-    } catch (err) {
+    } catch {
       alert('Error creando orden')
     } finally {
       setLoading(false)
@@ -64,7 +64,7 @@ export default function OrdersPanel({ symbol }) {
         body: JSON.stringify({ exit_price: parseFloat(exitPrice), status: 'closed' })
       })
       if (res.ok) loadOrders()
-    } catch (err) {
+    } catch {
       alert('Error cerrando orden')
     }
   }
@@ -76,7 +76,7 @@ export default function OrdersPanel({ symbol }) {
         credentials: 'include'
       })
       loadOrders()
-    } catch (err) {
+    } catch {
       alert('Error cancelando orden')
     }
   }

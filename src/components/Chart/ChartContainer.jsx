@@ -32,15 +32,6 @@ function baseOptions(el) {
   }
 }
 
-function syncCharts(sourceChart, targetCharts) {
-  sourceChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-    if (range === null) return
-    targetCharts.forEach(target => {
-      target.timeScale().setVisibleLogicalRange(range)
-    })
-  })
-}
-
 function IndicatorChart({ containerRef, data, seriesType, color, onChartReady, priceLines, getLineColor, zones }) {
   const chartRef = useRef(null)
   const seriesRef = useRef(null)
@@ -88,7 +79,7 @@ function IndicatorChart({ containerRef, data, seriesType, color, onChartReady, p
     }
 
     if (zones && chart && data.length > 0) {
-      zoneSeriesRef.current.forEach(zs => { if (zs) try { chart.removeSeries(zs) } catch {} })
+      zoneSeriesRef.current.forEach(zs => { if (zs) try { chart.removeSeries(zs) } catch (_) {} })
       zoneSeriesRef.current = []
       zones.forEach(({ linePrice, base, topColor, bottomColor }) => {
         const zs = chart.addSeries(AreaSeries, {
@@ -109,13 +100,12 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
   const rsiAreaRef = useRef(null)
   const macdAreaRef = useRef(null)
   const chartRef = useRef(null)
-  const rsiChartRef = useRef(null)
-  const macdChartRef = useRef(null)
   const candleSeriesRef = useRef(null)
   const allDataRef = useRef([])
   const loadingMoreRef = useRef(false)
   const [chartRange, setChartRange] = useState(DEFAULT_RANGE)
   const measureToolRef = useRef(null)
+  const [measureToolActive, setMeasureToolActive] = useState(false)
   const [rsiChart, setRsiChart] = useState(null)
   const [macdChart, setMacdChart] = useState(null)
   const isSyncingRef = useRef(false)
@@ -212,7 +202,7 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
         if (!s[key]) s[key] = chart.addSeries(LineSeries, { color, lineWidth: 1.5 })
         s[key].setData(data)
       } else if (s[key]) {
-        try { chart.removeSeries(s[key]) } catch {}
+        try { chart.removeSeries(s[key]) } catch (_) {}
         s[key] = null
       }
     })
@@ -226,7 +216,7 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
       s['bb_up'].setData(bbData.upper)
       s['bb_lo'].setData(bbData.lower)
     } else {
-      ['bb_mid','bb_up','bb_lo'].forEach(k => { if (s[k]) { try { chart.removeSeries(s[k]) } catch {}; s[k] = null } })
+      ['bb_mid','bb_up','bb_lo'].forEach(k => { if (s[k]) { try { chart.removeSeries(s[k]) } catch (_) {}; s[k] = null } })
     }
 
     // Support / Resistance — horizontal dashed lines
@@ -254,7 +244,7 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
       })
     } else {
       Object.keys(s).filter(k => k.startsWith('sr_')).forEach(k => {
-        if (s[k]) { try { chart.removeSeries(s[k]) } catch {}; s[k] = null }
+        if (s[k]) { try { chart.removeSeries(s[k]) } catch (_) {}; s[k] = null }
       })
     }
   }, [
@@ -269,7 +259,7 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
       try {
         const candle = await fetchLatestCandle(symbol, timeframe)
         if (candle) candleSeriesRef.current?.update(candle)
-      } catch {}
+      } catch (_) {}
     }, 10000)
     return () => clearInterval(id)
   }, [symbol, timeframe])
@@ -277,7 +267,7 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
   const unsubsRef = useRef([])
 
   useEffect(() => {
-    unsubsRef.current.forEach(fn => { try { fn() } catch {} })
+    unsubsRef.current.forEach(fn => { try { fn() } catch (_) {} })
     unsubsRef.current = []
 
     const main = chartRef.current
@@ -297,7 +287,7 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
     })
 
     return () => {
-      unsubsRef.current.forEach(fn => { try { fn() } catch {} })
+      unsubsRef.current.forEach(fn => { try { fn() } catch (_) {} })
       unsubsRef.current = []
     }
   }, [rsiChart, macdChart])
@@ -308,10 +298,13 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
       <div className="flex flex-1 min-h-0">
         <div className="w-8 bg-surface border-r border-border flex flex-col items-center py-2 shrink-0">
           <button
-            onClick={() => measureToolRef.current?.toggle()}
+            onClick={() => {
+              measureToolRef.current?.toggle()
+              setMeasureToolActive(!measureToolActive)
+            }}
             title="Medir"
             className={`w-6 h-6 flex items-center justify-center rounded text-sm transition-colors
-              ${measureToolRef.current?.active ? 'bg-accent text-white' : 'text-text hover:bg-border'}`}
+              ${measureToolActive ? 'bg-accent text-white' : 'text-text hover:bg-border'}`}
           >
             📏
           </button>

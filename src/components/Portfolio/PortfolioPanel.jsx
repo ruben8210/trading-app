@@ -32,13 +32,16 @@ function formatDate(d) {
   return dt.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
 
-export default function PortfolioPanel({ open, onClose, currentSymbol }) {
+export default function PortfolioPanel({ open, onClose, currentSymbol, onOrdersChange }) {
   const [orders, setOrders] = useState([])
   const [period, setPeriod] = useState('all')
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [form, setForm] = useState({ symbol: '', side: 'buy', quantity: 1, entry_price: 0 })
+  const [form, setForm] = useState({
+    symbol: '', side: 'buy', quantity: 1, entry_price: 0,
+    market_type: 'spot', leverage: 1, stop_loss: '', take_profit: '', notes: ''
+  })
   const [closingId, setClosingId] = useState(null)
   const [closePrice, setClosePrice] = useState('')
 
@@ -49,7 +52,10 @@ export default function PortfolioPanel({ open, onClose, currentSymbol }) {
     setLoading(true)
     fetch('/api/v1/orders', { credentials: 'include', headers: authHeaders })
       .then(r => r.ok ? r.json() : [])
-      .then(setOrders)
+      .then(d => {
+        setOrders(d)
+        onOrdersChange?.()
+      })
       .catch(() => setOrders([]))
       .finally(() => setLoading(false))
   }
@@ -67,20 +73,30 @@ export default function PortfolioPanel({ open, onClose, currentSymbol }) {
     }
     setSubmitting(true)
     try {
+      const payload = {
+        symbol: form.symbol,
+        side: form.side,
+        quantity: parseFloat(form.quantity),
+        entry_price: parseFloat(form.entry_price),
+        market_type: form.market_type,
+        leverage: form.market_type === 'futures' ? parseFloat(form.leverage) : 1,
+      }
+      if (form.stop_loss) payload.stop_loss = parseFloat(form.stop_loss)
+      if (form.take_profit) payload.take_profit = parseFloat(form.take_profit)
+      if (form.notes) payload.notes = form.notes
+
       const res = await fetch('/api/v1/orders', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
-          symbol: form.symbol,
-          side: form.side,
-          quantity: parseFloat(form.quantity),
-          entry_price: parseFloat(form.entry_price),
-        }),
+        body: JSON.stringify(payload),
       })
       if (res.ok) {
         setShowForm(false)
-        setForm({ symbol: currentSymbol || '', side: 'buy', quantity: 1, entry_price: 0 })
+        setForm({
+          symbol: currentSymbol || '', side: 'buy', quantity: 1, entry_price: 0,
+          market_type: 'spot', leverage: 1, stop_loss: '', take_profit: '', notes: ''
+        })
         loadOrders()
       } else {
         alert('Error al crear operación')
@@ -177,21 +193,54 @@ export default function PortfolioPanel({ open, onClose, currentSymbol }) {
         </div>
 
         {showForm && (
-          <div className="bg-bg border-b border-border p-3 space-y-2">
+          <div className="bg-bg border-b border-border p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+            <div className="flex gap-1">
+              <button
+                onClick={() => setForm({ ...form, market_type: 'spot', leverage: 1 })}
+                className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${
+                  form.market_type === 'spot' ? 'bg-accent text-white' : 'bg-surface text-text/60'
+                }`}
+              >SPOT</button>
+              <button
+                onClick={() => setForm({ ...form, market_type: 'futures' })}
+                className={`flex-1 py-1 rounded text-xs font-bold transition-colors ${
+                  form.market_type === 'futures' ? 'bg-accent text-white' : 'bg-surface text-text/60'
+                }`}
+              >FUTUROS</button>
+            </div>
+
+            {form.market_type === 'futures' && (
+              <div>
+                <p className="text-[10px] text-text/50 mb-1">Apalancamiento</p>
+                <div className="flex gap-1 flex-wrap">
+                  {[1, 2, 5, 10, 20, 50, 100].map(lev => (
+                    <button
+                      key={lev}
+                      onClick={() => setForm({ ...form, leverage: lev })}
+                      className={`flex-1 py-1 rounded text-[10px] font-bold transition-colors ${
+                        Number(form.leverage) === lev ? 'bg-yellow-500 text-black' : 'bg-surface text-text/60'
+                      }`}
+                    >{lev}x</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={() => setForm({ ...form, side: 'buy' })}
                 className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
                   form.side === 'buy' ? 'bg-green-500 text-white' : 'bg-surface text-text/60'
                 }`}
-              >COMPRAR</button>
+              >{form.market_type === 'futures' ? 'LONG' : 'COMPRAR'}</button>
               <button
                 onClick={() => setForm({ ...form, side: 'sell' })}
                 className={`flex-1 py-1.5 rounded text-xs font-bold transition-colors ${
                   form.side === 'sell' ? 'bg-red-500 text-white' : 'bg-surface text-text/60'
                 }`}
-              >VENDER (corto)</button>
+              >{form.market_type === 'futures' ? 'SHORT' : 'VENDER'}</button>
             </div>
+
             <input
               type="text"
               placeholder="Símbolo (BTC, AAPL...)"
@@ -199,35 +248,96 @@ export default function PortfolioPanel({ open, onClose, currentSymbol }) {
               onChange={e => setForm({ ...form, symbol: e.target.value.toUpperCase() })}
               className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text"
             />
+
             <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                step="any"
-                placeholder="Cantidad"
-                value={form.quantity}
-                onChange={e => setForm({ ...form, quantity: e.target.value })}
-                className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text"
-              />
-              <input
-                type="number"
-                step="any"
-                placeholder="Precio entrada"
-                value={form.entry_price}
-                onChange={e => setForm({ ...form, entry_price: e.target.value })}
-                className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text"
-              />
+              <div>
+                <p className="text-[10px] text-text/50 mb-1">Cantidad</p>
+                <input
+                  type="number" step="any"
+                  value={form.quantity}
+                  onChange={e => setForm({ ...form, quantity: e.target.value })}
+                  className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-text/50 mb-1">Precio entrada</p>
+                <input
+                  type="number" step="any"
+                  value={form.entry_price}
+                  onChange={e => setForm({ ...form, entry_price: e.target.value })}
+                  className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text"
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] text-text/50 mb-1">Stop Loss (opc)</p>
+                <input
+                  type="number" step="any"
+                  value={form.stop_loss}
+                  onChange={e => setForm({ ...form, stop_loss: e.target.value })}
+                  className="w-full bg-surface border border-red-500/30 rounded px-2 py-1.5 text-sm text-text"
+                />
+              </div>
+              <div>
+                <p className="text-[10px] text-text/50 mb-1">Take Profit (opc)</p>
+                <input
+                  type="number" step="any"
+                  value={form.take_profit}
+                  onChange={e => setForm({ ...form, take_profit: e.target.value })}
+                  className="w-full bg-surface border border-green-500/30 rounded px-2 py-1.5 text-sm text-text"
+                />
+              </div>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Notas / estrategia (opcional)"
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-text/80"
+            />
+
             {form.quantity > 0 && form.entry_price > 0 && (
-              <p className="text-xs text-text/60">
-                Total: <span className="text-text font-semibold">${(form.quantity * form.entry_price).toFixed(2)}</span>
-              </p>
+              <div className="bg-surface rounded p-2 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-text/60">Valor posición:</span>
+                  <span className="text-text font-semibold">${(form.quantity * form.entry_price).toFixed(2)}</span>
+                </div>
+                {form.market_type === 'futures' && (
+                  <div className="flex justify-between">
+                    <span className="text-text/60">Margen ({form.leverage}x):</span>
+                    <span className="text-yellow-400 font-semibold">${(form.quantity * form.entry_price / form.leverage).toFixed(2)}</span>
+                  </div>
+                )}
+                {form.stop_loss > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-text/60">Pérdida máx:</span>
+                    <span className="text-red-400 font-semibold">
+                      ${(Math.abs(form.entry_price - form.stop_loss) * form.quantity).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                {form.take_profit > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-text/60">Ganancia obj:</span>
+                    <span className="text-green-400 font-semibold">
+                      ${(Math.abs(form.take_profit - form.entry_price) * form.quantity).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
+
             <button
               onClick={createOrder}
               disabled={submitting}
-              className="w-full bg-accent hover:bg-accent/80 disabled:opacity-50 text-white text-sm py-2 rounded font-bold"
+              className={`w-full disabled:opacity-50 text-white text-sm py-2 rounded font-bold ${
+                form.side === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+              }`}
             >
-              {submitting ? 'Enviando...' : `Abrir operación ${form.side === 'buy' ? 'LARGA' : 'CORTA'}`}
+              {submitting ? 'Enviando...' : `Abrir ${form.market_type === 'futures' ? form.leverage + 'x ' : ''}${form.side === 'buy' ? 'LONG' : 'SHORT'} ${form.symbol}`}
             </button>
           </div>
         )}
@@ -316,15 +426,25 @@ export default function PortfolioPanel({ open, onClose, currentSymbol }) {
                     {open_.map(o => (
                       <div key={o.id} className="bg-bg border border-accent/30 rounded p-2 text-xs">
                         <div className="flex justify-between items-start">
-                          <div>
+                          <div className="flex items-center gap-1 flex-wrap">
                             <span className={`font-semibold ${o.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
-                              {o.side.toUpperCase()}
+                              {o.market_type === 'futures' ? (o.side === 'buy' ? 'LONG' : 'SHORT') : o.side.toUpperCase()}
                             </span>
-                            <span className="text-text ml-1 font-semibold">{o.symbol}</span>
-                            <span className="text-text/60 ml-2">x{o.quantity}</span>
+                            <span className="text-text font-semibold">{o.symbol}</span>
+                            {o.market_type === 'futures' && o.leverage > 1 && (
+                              <span className="bg-yellow-500/20 text-yellow-400 px-1 rounded text-[10px] font-bold">{o.leverage}x</span>
+                            )}
+                            <span className="text-text/60">x{o.quantity}</span>
                           </div>
                           <span className="text-text/50">@${o.entry_price?.toFixed(2)}</span>
                         </div>
+                        {(o.stop_loss || o.take_profit) && (
+                          <div className="flex gap-2 mt-1 text-[10px]">
+                            {o.stop_loss && <span className="text-red-400">SL: ${o.stop_loss.toFixed(2)}</span>}
+                            {o.take_profit && <span className="text-green-400">TP: ${o.take_profit.toFixed(2)}</span>}
+                          </div>
+                        )}
+                        {o.notes && <p className="text-[10px] text-text/50 italic mt-1">{o.notes}</p>}
                         {closingId === o.id ? (
                           <div className="flex gap-1 mt-2">
                             <input
@@ -366,12 +486,15 @@ export default function PortfolioPanel({ open, onClose, currentSymbol }) {
                   {closed.slice().reverse().map(o => (
                     <div key={o.id} className="bg-bg border border-border rounded p-2 text-xs">
                       <div className="flex justify-between items-start">
-                        <div>
+                        <div className="flex items-center gap-1 flex-wrap">
                           <span className={`font-semibold ${o.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
-                            {o.side.toUpperCase()}
+                            {o.market_type === 'futures' ? (o.side === 'buy' ? 'LONG' : 'SHORT') : o.side.toUpperCase()}
                           </span>
-                          <span className="text-text ml-1 font-semibold">{o.symbol}</span>
-                          <span className="text-text/60 ml-2">x{o.quantity}</span>
+                          <span className="text-text font-semibold">{o.symbol}</span>
+                          {o.market_type === 'futures' && o.leverage > 1 && (
+                            <span className="bg-yellow-500/20 text-yellow-400 px-1 rounded text-[10px] font-bold">{o.leverage}x</span>
+                          )}
+                          <span className="text-text/60">x{o.quantity}</span>
                         </div>
                         <span className="text-text/50">{formatDate(o.closed_at || o.created_at)}</span>
                       </div>

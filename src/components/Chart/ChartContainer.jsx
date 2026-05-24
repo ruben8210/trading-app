@@ -95,7 +95,7 @@ function IndicatorChart({ containerRef, data, seriesType, color, onChartReady, p
   return null
 }
 
-export default function ChartContainer({ symbol, timeframe, indicators }) {
+export default function ChartContainer({ symbol, timeframe, indicators, ordersTrigger = 0 }) {
   const chartAreaRef = useRef(null)
   const rsiAreaRef = useRef(null)
   const macdAreaRef = useRef(null)
@@ -103,6 +103,8 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
   const candleSeriesRef = useRef(null)
   const allDataRef = useRef([])
   const loadingMoreRef = useRef(false)
+  const orderLinesRef = useRef([])
+  const [symbolOrders, setSymbolOrders] = useState([])
   const [chartRange, setChartRange] = useState(DEFAULT_RANGE)
   const measureToolRef = useRef(null)
   const [measureToolActive, setMeasureToolActive] = useState(false)
@@ -163,6 +165,74 @@ export default function ChartContainer({ symbol, timeframe, indicators }) {
       chart.remove()
     }
   }, [loadMore])
+
+  useEffect(() => {
+    if (!symbol) return
+    const token = localStorage.getItem('trading_token')
+    fetch('/api/v1/orders', {
+      credentials: 'include',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(all => {
+        const sym = symbol.toUpperCase()
+        const filtered = all.filter(o =>
+          o.status === 'filled' && (o.symbol === sym || o.symbol === sym + 'USDT' || o.symbol.replace('USDT', '') === sym)
+        )
+        setSymbolOrders(filtered)
+      })
+      .catch(() => setSymbolOrders([]))
+  }, [symbol, ordersTrigger])
+
+  useEffect(() => {
+    const series = candleSeriesRef.current
+    if (!series) return
+
+    orderLinesRef.current.forEach(line => {
+      try { series.removePriceLine(line) } catch {}
+    })
+    orderLinesRef.current = []
+
+    symbolOrders.forEach(o => {
+      const isLong = o.side === 'buy'
+      const sideLabel = o.market_type === 'futures' ? (isLong ? 'LONG' : 'SHORT') : (isLong ? 'BUY' : 'SELL')
+      const lev = o.market_type === 'futures' && o.leverage > 1 ? ` ${o.leverage}x` : ''
+
+      const entryLine = series.createPriceLine({
+        price: o.entry_price,
+        color: isLong ? '#22c55e' : '#ef4444',
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        axisLabelVisible: true,
+        title: `${sideLabel}${lev} @${o.entry_price}`,
+      })
+      orderLinesRef.current.push(entryLine)
+
+      if (o.stop_loss) {
+        const slLine = series.createPriceLine({
+          price: o.stop_loss,
+          color: '#ef4444',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `SL`,
+        })
+        orderLinesRef.current.push(slLine)
+      }
+
+      if (o.take_profit) {
+        const tpLine = series.createPriceLine({
+          price: o.take_profit,
+          color: '#22c55e',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `TP`,
+        })
+        orderLinesRef.current.push(tpLine)
+      }
+    })
+  }, [symbolOrders, data])
 
   useEffect(() => {
     if (!candleSeriesRef.current) return

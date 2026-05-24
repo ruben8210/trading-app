@@ -20,13 +20,13 @@ class UserPreference(Base):
     user_id = Column(Integer, nullable=False, index=True)
     data = Column(Text, nullable=False, default="{}")  # JSON string
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
 class Order(Base):
     __tablename__ = "orders"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     symbol = Column(String(20), nullable=False)
@@ -37,6 +37,11 @@ class Order(Base):
     status = Column(String(20), default="pending")
     pnl = Column(Float, nullable=True)
     pnl_percent = Column(Float, nullable=True)
+    market_type = Column(String(20), default="spot")
+    leverage = Column(Float, default=1.0)
+    stop_loss = Column(Float, nullable=True)
+    take_profit = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     closed_at = Column(DateTime, nullable=True)
 

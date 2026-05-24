@@ -13,6 +13,26 @@ from trading_api.auth import verify_password, create_access_token, get_current_u
 from trading_api.routes import users, preferences, stocks, orders
 
 Base.metadata.create_all(bind=engine)
+
+def _ensure_order_columns():
+    from sqlalchemy import text
+    new_cols = [
+        ("market_type", "VARCHAR(20) DEFAULT 'spot'"),
+        ("leverage", "FLOAT DEFAULT 1.0"),
+        ("stop_loss", "FLOAT"),
+        ("take_profit", "FLOAT"),
+        ("notes", "TEXT"),
+    ]
+    with engine.connect() as conn:
+        for col_name, col_type in new_cols:
+            try:
+                conn.execute(text(f"ALTER TABLE orders ADD COLUMN IF NOT EXISTS {col_name} {col_type}"))
+                conn.commit()
+            except Exception:
+                pass
+
+_ensure_order_columns()
+
 app = FastAPI(title="Trading API", version="1.0.0")
 
 app.add_middleware(

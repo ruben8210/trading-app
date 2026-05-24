@@ -20,6 +20,7 @@ function AppContent({ user, onLogout }) {
   })
   const [indicatorPanelOpen, setIndicatorPanelOpen] = useState(false)
   const [portfolioOpen, setPortfolioOpen] = useState(false)
+  const [ordersTrigger, setOrdersTrigger] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
 
   const handleIndicatorToggle = (key) => {
@@ -92,7 +93,7 @@ function AppContent({ user, onLogout }) {
                     ✕ Salir
                   </button>
                 )}
-                <ChartContainer symbol={symbol} timeframe={timeframe} indicators={indicators} />
+                <ChartContainer symbol={symbol} timeframe={timeframe} indicators={indicators} ordersTrigger={ordersTrigger} />
               </div>
             </main>
           </>
@@ -108,7 +109,12 @@ function AppContent({ user, onLogout }) {
         />
       )}
 
-      <PortfolioPanel open={portfolioOpen} onClose={() => setPortfolioOpen(false)} currentSymbol={symbol} />
+      <PortfolioPanel
+        open={portfolioOpen}
+        onClose={() => setPortfolioOpen(false)}
+        currentSymbol={symbol}
+        onOrdersChange={() => setOrdersTrigger(t => t + 1)}
+      />
     </div>
   )
 }

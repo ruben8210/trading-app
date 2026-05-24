@@ -214,21 +214,21 @@ export default function Watchlist({ onSelect }) {
           </div>
         )}
       </div>
-      <div className="relative p-2 border-t border-border" ref={wrapperRef}>
-        <div className="flex gap-1">
+      <div className="relative p-3 border-t border-border bg-surface z-20 shrink-0" ref={wrapperRef}>
+        <div className="flex gap-2">
           <input
             value={input}
             onChange={e => handleInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addSymbol()}
             onFocus={() => input.length > 0 && setShowSuggestions(true)}
-            placeholder="Buscar simbolo..."
-            className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text placeholder:text-border"
+            placeholder="Buscar símbolo..."
+            className="flex-1 min-w-0 bg-bg border border-border rounded px-3 py-1.5 text-xs text-text placeholder:text-border focus:outline-none focus:border-accent transition-colors"
           />
           <button onClick={() => addSymbol()}
-            className="px-2 py-1 bg-accent text-white rounded text-xs font-medium hover:opacity-90">+</button>
+            className="shrink-0 px-3 py-1.5 bg-accent text-white rounded text-sm font-bold hover:opacity-90 transition-opacity">+</button>
         </div>
         {showSuggestions && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-surface border border-border rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+          <div className="absolute bottom-full left-3 right-3 mb-2 bg-surface border border-border rounded shadow-lg z-50 max-h-48 overflow-y-auto">
             {searching && (
               <div className="px-3 py-2 text-xs text-text/50">Buscando...</div>
             )}

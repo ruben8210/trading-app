@@ -108,7 +108,7 @@ function AppContent({ user, onLogout }) {
         />
       )}
 
-      <PortfolioPanel open={portfolioOpen} onClose={() => setPortfolioOpen(false)} />
+      <PortfolioPanel open={portfolioOpen} onClose={() => setPortfolioOpen(false)} currentSymbol={symbol} />
     </div>
   )
 }

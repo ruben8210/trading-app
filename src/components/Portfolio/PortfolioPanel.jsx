@@ -44,9 +44,24 @@ export default function PortfolioPanel({ open, onClose, currentSymbol, onOrdersC
   })
   const [closingId, setClosingId] = useState(null)
   const [closePrice, setClosePrice] = useState('')
+  const [closingAtMarket, setClosingAtMarket] = useState(null)
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('trading_token') : null
   const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {}
+
+  const fetchCurrentPrice = async (symbol) => {
+    try {
+      const res = await fetch(`/api/v1/proxy/binance/ticker/${symbol}`,
+        { credentials: 'include', headers: authHeaders })
+      if (res.ok) {
+        const data = await res.json()
+        return data.price
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
 
   const loadOrders = () => {
     setLoading(true)
@@ -108,8 +123,9 @@ export default function PortfolioPanel({ open, onClose, currentSymbol, onOrdersC
     }
   }
 
-  const closeOrder = async (orderId) => {
-    if (!closePrice) {
+  const closeOrder = async (orderId, exitPrice = null) => {
+    const price = exitPrice || closePrice
+    if (!price) {
       alert('Ingresa el precio de salida')
       return
     }
@@ -118,15 +134,45 @@ export default function PortfolioPanel({ open, onClose, currentSymbol, onOrdersC
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ exit_price: parseFloat(closePrice), status: 'closed' }),
+        body: JSON.stringify({ exit_price: parseFloat(price), status: 'closed' }),
       })
       if (res.ok) {
         setClosingId(null)
         setClosePrice('')
+        setClosingAtMarket(null)
         loadOrders()
       }
     } catch {
       alert('Error al cerrar operación')
+    }
+  }
+
+  const closeAtMarket = async (orderId) => {
+    setClosingAtMarket(orderId)
+    const order = orders.find(o => o.id === orderId)
+    if (!order) return
+
+    const currentPrice = await fetchCurrentPrice(order.symbol)
+    if (currentPrice == null) {
+      alert('No se pudo obtener el precio del mercado')
+      setClosingAtMarket(null)
+      return
+    }
+
+    await closeOrder(orderId, currentPrice)
+  }
+
+  const deleteClosedOrder = async (orderId) => {
+    if (!confirm('¿Eliminar esta operación del historial?')) return
+    try {
+      await fetch(`/api/v1/orders/${orderId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: authHeaders,
+      })
+      loadOrders()
+    } catch {
+      alert('Error al eliminar operación')
     }
   }
 
@@ -463,9 +509,14 @@ export default function PortfolioPanel({ open, onClose, currentSymbol, onOrdersC
                           </div>
                         ) : (
                           <div className="flex gap-1 mt-2">
+                            <button onClick={() => closeAtMarket(o.id)}
+                              disabled={closingAtMarket === o.id}
+                              className="flex-1 bg-green-500/20 hover:bg-green-500/40 text-green-400 text-xs py-1 rounded font-medium disabled:opacity-50">
+                              {closingAtMarket === o.id ? 'Cerrando...' : '⚡ Mercado'}
+                            </button>
                             <button onClick={() => { setClosingId(o.id); setClosePrice('') }}
                               className="flex-1 bg-accent/20 hover:bg-accent/40 text-accent text-xs py-1 rounded font-medium">
-                              Cerrar operación
+                              Cerrar
                             </button>
                             <button onClick={() => cancelOrder(o.id)}
                               className="bg-red-500/20 hover:bg-red-500/40 text-red-400 px-2 rounded text-xs">🗑</button>
@@ -496,13 +547,17 @@ export default function PortfolioPanel({ open, onClose, currentSymbol, onOrdersC
                           )}
                           <span className="text-text/60">x{o.quantity}</span>
                         </div>
-                        <span className="text-text/50">{formatDate(o.closed_at || o.created_at)}</span>
+                        <button onClick={() => deleteClosedOrder(o.id)}
+                          className="text-text/50 hover:text-red-400 transition text-sm">
+                          🗑
+                        </button>
                       </div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-text/60">
                           ${o.entry_price?.toFixed(2)} → ${o.exit_price?.toFixed(2)}
                         </span>
                         <div className="text-right">
+                          <span className="text-text/50 block">{formatDate(o.closed_at || o.created_at)}</span>
                           <span className={o.pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
                             {o.pnl >= 0 ? '+' : ''}${formatCurrency(o.pnl)}
                           </span>

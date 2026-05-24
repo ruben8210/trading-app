@@ -235,8 +235,8 @@ async def yahoo_quote(symbol: str):
             prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
 
             if price is None:
-                quote = (r.get("indicators", {}).get("quote") or [{}])[0]
-                closes = [c for c in (quote.get("close") or []) if c is not None]
+                q_data = (r.get("indicators", {}).get("quote") or [{}])[0]
+                closes = [c for c in (q_data.get("close") or []) if c is not None]
                 if closes:
                     price = closes[-1]
                     if prev_close is None and len(closes) >= 2:

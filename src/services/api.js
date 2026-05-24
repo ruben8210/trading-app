@@ -51,12 +51,21 @@ export const fetchTicker = async (symbol) => {
   }
 };
 
+export const isCrypto = (symbol) => {
+  return symbol.toUpperCase().endsWith("USDT") || ["BTC", "ETH"].includes(symbol.toUpperCase());
+};
+
 export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
   if (!symbol || typeof symbol !== 'string') {
     throw new Error('Symbol debe ser una cadena válida');
   }
   if (!interval || typeof interval !== 'string') {
     throw new Error('Interval debe ser una cadena válida');
+  }
+
+  if (!isCrypto(symbol)) {
+    console.warn(`Datos históricos no disponibles para ${symbol} (solo cryptos soportados)`);
+    return [];
   }
 
   try {
@@ -81,10 +90,6 @@ export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
   }
 };
 
-export const isCrypto = (symbol) => {
-  return symbol.toUpperCase().endsWith("USDT") || ["BTC", "ETH"].includes(symbol.toUpperCase());
-};
-
 export const fetchOHLCV = async (symbol, interval = "1d") => {
   return fetchBars(symbol, interval, 100);
 };
@@ -94,9 +99,13 @@ export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100, befor
     throw new Error('Symbol debe ser una cadena válida');
   }
 
+  if (!isCrypto(symbol)) {
+    return [];
+  }
+
   try {
     const params = new URLSearchParams({
-      interval: interval || '1d',
+      interval: (interval || '1d').toLowerCase(),
       limit: Math.min(Math.max(limit, 1), 1000),
     });
 

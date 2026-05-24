@@ -1,11 +1,23 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { fetchTicker, isCrypto } from '../../services/api'
+import { fetchTicker, isCrypto, isForex, isCommodity } from '../../services/api'
 
 const STORAGE_KEY = 'trading-watchlist'
 const VERSION_KEY = 'trading-watchlist-v'
 const LIST_VERSION = 2
 const DEFAULT_LIST = ['BTCUSDT', 'ETHUSDT', 'AAPL', 'TSLA', 'NVDA']
 const TWELVEDATA_TOKEN = import.meta.env.VITE_TWELVEDATA_TOKEN || ''
+
+const SYMBOL_NAMES = {
+  'GC=F': 'Oro', 'SI=F': 'Plata', 'CL=F': 'Petróleo WTI', 'BZ=F': 'Petróleo Brent',
+  'NG=F': 'Gas Natural', 'HG=F': 'Cobre', 'PL=F': 'Platino', 'ZC=F': 'Maíz',
+  'ZW=F': 'Trigo', 'KC=F': 'Café', 'SB=F': 'Azúcar',
+  'EURUSD=X': 'Euro / Dólar', 'GBPUSD=X': 'Libra / Dólar', 'USDJPY=X': 'Dólar / Yen',
+  'USDCHF=X': 'Dólar / Franco', 'AUDUSD=X': 'Dólar Aus. / Dólar', 'USDCAD=X': 'Dólar / Dólar Can.',
+  'EURGBP=X': 'Euro / Libra', 'EURJPY=X': 'Euro / Yen',
+}
+
+const POPULAR_COMMODITIES = ['GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F']
+const POPULAR_FOREX = ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'AUDUSD=X', 'USDCAD=X']
 
 function loadList() {
   try {
@@ -28,10 +40,11 @@ function formatPrice(price) {
 
 function WatchlistItem({ name, onSelect, price, change, dead }) {
   const isPos = change != null && change >= 0
+  const label = SYMBOL_NAMES[name]
   if (dead) {
     return (
       <div className="flex items-center justify-between w-full px-3 py-2 text-xs text-left">
-        <span className="text-white font-medium">{name}</span>
+        <span className="text-white font-medium">{label || name}</span>
         <span className="text-red">N/A</span>
       </div>
     )
@@ -41,8 +54,11 @@ function WatchlistItem({ name, onSelect, price, change, dead }) {
       onClick={() => onSelect(name)}
       className="flex items-center justify-between w-full px-3 py-2 text-xs hover:bg-border/40 rounded transition-colors text-left"
     >
-      <span className="text-white font-medium">{name}</span>
-      <div className="text-right">
+      <div className="min-w-0">
+        <span className="text-white font-medium block truncate">{label || name}</span>
+        {label && <span className="text-text/40 text-[10px]">{name}</span>}
+      </div>
+      <div className="text-right shrink-0 ml-2">
         <div className="font-mono">{formatPrice(price)}</div>
         {change != null && (
           <div className={isPos ? 'text-green' : 'text-red'}>
@@ -121,7 +137,9 @@ export default function Watchlist({ onSelect }) {
   const wrapperRef = useRef(null)
 
   const cryptos = list.filter(n => isCrypto(n))
-  const stocks = list.filter(n => !isCrypto(n))
+  const commodities = list.filter(n => isCommodity(n))
+  const forex = list.filter(n => isForex(n))
+  const stocks = list.filter(n => !isCrypto(n) && !isCommodity(n) && !isForex(n))
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
@@ -158,11 +176,19 @@ export default function Watchlist({ onSelect }) {
     setSearching(true)
     setShowSuggestions(true)
     searchTimer.current = setTimeout(async () => {
+      const q = val.toUpperCase()
+      const localMatches = [...POPULAR_COMMODITIES, ...POPULAR_FOREX]
+        .filter(sym => sym.includes(q) || (SYMBOL_NAMES[sym] || '').toUpperCase().includes(q))
+        .map(sym => ({
+          symbol: sym,
+          name: SYMBOL_NAMES[sym] || '',
+          type: isCommodity(sym) ? 'M. PRIMA' : 'DIVISA',
+        }))
       const [cryptoResults, stockResults] = await Promise.all([
-        searchBinance(val.toUpperCase()),
-        searchTwelveData(val.toUpperCase())
+        searchBinance(q),
+        searchTwelveData(q)
       ])
-      setSuggestions([...cryptoResults, ...stockResults])
+      setSuggestions([...localMatches, ...cryptoResults, ...stockResults])
       setSearching(false)
     }, 400)
   }, [])
@@ -205,6 +231,30 @@ export default function Watchlist({ onSelect }) {
           <div>
             <div className="px-3 py-1.5 text-xs text-text/50 uppercase tracking-wider font-semibold">ACCIONES</div>
             {stocks.map(name => (
+              <div key={name} className="group relative">
+                <StockItem name={name} onSelect={onSelect} />
+                <button onClick={e => removeSymbol(e, name)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-border hover:text-red text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {commodities.length > 0 && (
+          <div>
+            <div className="px-3 py-1.5 text-xs text-text/50 uppercase tracking-wider font-semibold">MATERIAS PRIMAS</div>
+            {commodities.map(name => (
+              <div key={name} className="group relative">
+                <StockItem name={name} onSelect={onSelect} />
+                <button onClick={e => removeSymbol(e, name)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-border hover:text-red text-xs px-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {forex.length > 0 && (
+          <div>
+            <div className="px-3 py-1.5 text-xs text-text/50 uppercase tracking-wider font-semibold">DIVISAS</div>
+            {forex.map(name => (
               <div key={name} className="group relative">
                 <StockItem name={name} onSelect={onSelect} />
                 <button onClick={e => removeSymbol(e, name)}

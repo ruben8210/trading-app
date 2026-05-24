@@ -6,20 +6,29 @@ const handleFetchError = (error, context) => {
   throw new Error(`${context}: ${message}`);
 };
 
+export const isCrypto = (symbol) => {
+  return symbol.toUpperCase().endsWith("USDT") || ["BTC", "ETH"].includes(symbol.toUpperCase());
+};
+
+export const isForex = (symbol) => symbol.toUpperCase().endsWith("=X");
+
+export const isCommodity = (symbol) => symbol.toUpperCase().endsWith("=F");
+
+const tickerEndpoint = (symbol) => {
+  const s = symbol.toUpperCase();
+  if (isCrypto(s)) return `${API_BASE}/proxy/binance/ticker/${encodeURIComponent(s)}`;
+  if (isForex(s) || isCommodity(s)) return `${API_BASE}/proxy/yahoo/quote/${encodeURIComponent(s)}`;
+  return `${API_BASE}/proxy/finnhub/quote/${encodeURIComponent(s)}`;
+};
+
 export const fetchTicker = async (symbol) => {
   if (!symbol || typeof symbol !== 'string') {
     throw new Error('Symbol debe ser una cadena válida');
   }
 
   try {
-    const cryptoSymbol = symbol.toUpperCase();
-    const isCrypto = cryptoSymbol.endsWith("USDT") || ["BTC", "ETH"].includes(cryptoSymbol);
-
-    const url = isCrypto
-      ? `${API_BASE}/proxy/binance/ticker/${cryptoSymbol}`
-      : `${API_BASE}/proxy/finnhub/quote/${cryptoSymbol}`;
-
-    const response = await fetch(url);
+    const sym = symbol.toUpperCase();
+    const response = await fetch(tickerEndpoint(sym));
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -31,17 +40,8 @@ export const fetchTicker = async (symbol) => {
       throw new Error('Respuesta vacía del servidor');
     }
 
-    if (isCrypto) {
-      return {
-        symbol: data.symbol || cryptoSymbol,
-        price: data.price ?? null,
-        change: data.change ?? 0,
-        changePercent: data.changePercent ?? 0,
-      };
-    }
-
     return {
-      symbol: data.symbol || cryptoSymbol,
+      symbol: data.symbol || sym,
       price: data.price ?? null,
       change: data.change ?? 0,
       changePercent: data.changePercent ?? 0,
@@ -49,10 +49,6 @@ export const fetchTicker = async (symbol) => {
   } catch (error) {
     handleFetchError(error, `Error al obtener ticker para ${symbol}`);
   }
-};
-
-export const isCrypto = (symbol) => {
-  return symbol.toUpperCase().endsWith("USDT") || ["BTC", "ETH"].includes(symbol.toUpperCase());
 };
 
 export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
@@ -67,7 +63,7 @@ export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
     const normalizedInterval = interval.toLowerCase();
     const safeLimit = Math.min(Math.max(limit, 1), 1000);
     const provider = isCrypto(symbol) ? 'binance' : 'yahoo';
-    const url = `${API_BASE}/proxy/${provider}/klines/${symbol}?interval=${normalizedInterval}&limit=${safeLimit}`;
+    const url = `${API_BASE}/proxy/${provider}/klines/${encodeURIComponent(symbol)}?interval=${normalizedInterval}&limit=${safeLimit}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -107,7 +103,7 @@ export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100, befor
     }
 
     const provider = isCrypto(symbol) ? 'binance' : 'yahoo';
-    const url = `${API_BASE}/proxy/${provider}/klines/${symbol}?${params}`;
+    const url = `${API_BASE}/proxy/${provider}/klines/${encodeURIComponent(symbol)}?${params}`;
     const response = await fetch(url);
 
     if (!response.ok) {

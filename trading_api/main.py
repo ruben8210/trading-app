@@ -204,6 +204,65 @@ async def yahoo_klines(
             return cached["data"]
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
+@proxy_router.get("/yahoo/quote/{symbol}")
+async def yahoo_quote(symbol: str):
+    symbol_upper = symbol.upper()
+    cache_key = f"yahoo_quote_{symbol_upper}"
+    now = time.time()
+
+    cached = _cache.get(cache_key)
+    if cached and (now - cached["time"]) < CACHE_TTL:
+        return cached["data"]
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"{YAHOO_BASE}/v8/finance/chart/{symbol_upper}"
+            resp = await client.get(url, params={
+                "interval": "1d",
+                "range": "5d",
+            }, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            data = resp.json()
+
+            chart = data.get("chart", {})
+            result_list = chart.get("result") or []
+            if not result_list:
+                raise HTTPException(status_code=404, detail="No data")
+            r = result_list[0]
+            meta = r.get("meta", {})
+            price = meta.get("regularMarketPrice")
+            prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
+
+            if price is None:
+                quote = (r.get("indicators", {}).get("quote") or [{}])[0]
+                closes = [c for c in (quote.get("close") or []) if c is not None]
+                if closes:
+                    price = closes[-1]
+                    if prev_close is None and len(closes) >= 2:
+                        prev_close = closes[-2]
+
+            price = float(price or 0)
+            prev_close = float(prev_close or price)
+            change = price - prev_close
+            change_percent = (change / prev_close * 100) if prev_close else 0
+
+            result = {
+                "symbol": symbol_upper,
+                "price": price,
+                "change": change,
+                "changePercent": change_percent,
+                "high": float(meta.get("regularMarketDayHigh") or 0),
+                "low": float(meta.get("regularMarketDayLow") or 0),
+            }
+            _cache[cache_key] = {"data": result, "time": now}
+            return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        if cached:
+            return cached["data"]
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
 @proxy_router.get("/finnhub/quote/{symbol}")
 async def finnhub_quote(symbol: str):
     symbol_upper = symbol.upper()

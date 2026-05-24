@@ -6,7 +6,7 @@ async function searchYahoo(query) {
   if (!res.ok) return []
   const json = await res.json()
   return (json.quotes || [])
-    .filter(q => q.symbol && !q.symbol.includes('='))
+    .filter(q => q.symbol && (!q.symbol.includes('=') || q.symbol.endsWith('=X') || q.symbol.endsWith('=F')))
     .slice(0, 8)
     .map(q => ({ symbol: q.symbol, name: q.shortname || q.longname || '', type: q.quoteType || '' }))
 }

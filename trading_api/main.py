@@ -1,6 +1,7 @@
 import os
 import time
 import httpx
+from urllib.parse import quote
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -159,7 +160,7 @@ async def yahoo_klines(
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            url = f"{YAHOO_BASE}/v8/finance/chart/{symbol_upper}"
+            url = f"{YAHOO_BASE}/v8/finance/chart/{quote(symbol_upper, safe='')}"
             resp = await client.get(url, params={
                 "interval": yahoo_interval,
                 "range": yahoo_range,
@@ -216,7 +217,7 @@ async def yahoo_quote(symbol: str):
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            url = f"{YAHOO_BASE}/v8/finance/chart/{symbol_upper}"
+            url = f"{YAHOO_BASE}/v8/finance/chart/{quote(symbol_upper, safe='')}"
             resp = await client.get(url, params={
                 "interval": "1d",
                 "range": "5d",

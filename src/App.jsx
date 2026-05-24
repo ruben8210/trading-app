@@ -14,6 +14,7 @@ function AppContent({ user, onLogout }) {
   const location = useLocation()
   const [symbol, setSymbol] = useState('BTC')
   const [timeframe, setTimeframe] = useState('1D')
+  const [chartType, setChartType] = useState('candles')
   const [indicators, setIndicators] = useState({
     sma20: true, sma50: false, ema20: false, rsi: true, macd: true,
     bollinger: false, sr: false,
@@ -77,6 +78,8 @@ function AppContent({ user, onLogout }) {
               indicators={indicators}
               onIndicatorToggle={handleIndicatorToggle}
               onOpenIndicators={() => setIndicatorPanelOpen(true)}
+              chartType={chartType}
+              onChartTypeChange={setChartType}
             />}
             <main className="flex-1 flex min-h-0 relative">
               {!fullscreen && (
@@ -93,7 +96,7 @@ function AppContent({ user, onLogout }) {
                     ✕ Salir
                   </button>
                 )}
-                <ChartContainer symbol={symbol} timeframe={timeframe} indicators={indicators} ordersTrigger={ordersTrigger} />
+                <ChartContainer symbol={symbol} timeframe={timeframe} indicators={indicators} ordersTrigger={ordersTrigger} chartType={chartType} />
               </div>
             </main>
           </>

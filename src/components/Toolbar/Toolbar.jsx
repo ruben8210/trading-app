@@ -25,13 +25,24 @@ const TF_LABELS = {
   '1D':'1D','1W':'1S','1M':'1M'
 }
 
-export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframeChange, indicators, onIndicatorToggle, onOpenIndicators }) {
+const CHART_TYPES = [
+  { key: 'candles',     label: 'Velas japonesas', icon: '📊' },
+  { key: 'hollow',      label: 'Velas huecas',    icon: '🕯️' },
+  { key: 'heikin-ashi', label: 'Heikin-Ashi',     icon: '🟢' },
+  { key: 'bars',        label: 'Barras OHLC',     icon: '📏' },
+  { key: 'line',        label: 'Línea',           icon: '📈' },
+  { key: 'area',        label: 'Área',            icon: '🌊' },
+]
+
+export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframeChange, indicators, onIndicatorToggle, onOpenIndicators, chartType = 'candles', onChartTypeChange }) {
   const [query, setQuery] = useState(symbol)
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [tfOpen, setTfOpen] = useState(false)
+  const [ctOpen, setCtOpen] = useState(false)
   const wrapperRef = useRef(null)
   const tfWrapperRef = useRef(null)
+  const ctWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -41,6 +52,7 @@ export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframe
     const handler = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false)
       if (tfWrapperRef.current && !tfWrapperRef.current.contains(e.target)) setTfOpen(false)
+      if (ctWrapperRef.current && !ctWrapperRef.current.contains(e.target)) setCtOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -77,6 +89,7 @@ export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframe
   }
 
   const activeCount = Object.values(indicators).filter(Boolean).length
+  const currentChartType = CHART_TYPES.find(c => c.key === chartType) || CHART_TYPES[0]
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-surface border-b border-border">
@@ -134,6 +147,31 @@ export default function Toolbar({ symbol, onSymbolChange, timeframe, onTimeframe
                   </button>
                 ))}
               </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="h-5 w-px bg-border" />
+      <div ref={ctWrapperRef} className="relative">
+        <button
+          onClick={() => setCtOpen(o => !o)}
+          title="Tipo de gráfica"
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-text hover:bg-border transition-colors"
+        >
+          <span>{currentChartType.icon}</span>
+          <span className="hidden sm:inline">{currentChartType.label}</span>
+          <span className="text-[10px] opacity-60">▼</span>
+        </button>
+        {ctOpen && (
+          <div className="absolute top-full left-0 mt-1 w-48 bg-[#1e222d] border border-border rounded shadow-lg z-50">
+            {CHART_TYPES.map(c => (
+              <button key={c.key}
+                onClick={() => { onChartTypeChange?.(c.key); setCtOpen(false) }}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-border/20 transition-colors flex items-center gap-2
+                  ${chartType === c.key ? 'text-accent font-semibold' : 'text-text'}`}>
+                <span>{c.icon}</span>
+                <span>{c.label}</span>
+              </button>
             ))}
           </div>
         )}

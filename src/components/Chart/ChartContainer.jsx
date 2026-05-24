@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createChart, CandlestickSeries, LineSeries, HistogramSeries, AreaSeries, LineStyle } from 'lightweight-charts'
+import { createChart, CandlestickSeries, BarSeries, LineSeries, HistogramSeries, AreaSeries, LineStyle } from 'lightweight-charts'
 import { useChartData } from '../../hooks/useChartData'
 import { fetchLatestCandle } from '../../services/api'
 import { useIndicators } from '../../hooks/useIndicators'
@@ -17,6 +17,62 @@ function getPriceFormat(price) {
   if (price >= 0.01)  return { precision: 5, minMove: 0.00001 }
   if (price >= 0.001) return { precision: 6, minMove: 0.000001 }
   return               { precision: 8, minMove: 0.00000001 }
+}
+
+function calculateHeikinAshi(data) {
+  const ha = []
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i]
+    const close = (d.open + d.high + d.low + d.close) / 4
+    const open = i === 0
+      ? (d.open + d.close) / 2
+      : (ha[i - 1].open + ha[i - 1].close) / 2
+    const high = Math.max(d.high, open, close)
+    const low = Math.min(d.low, open, close)
+    ha.push({ time: d.time, open, high, low, close })
+  }
+  return ha
+}
+
+function transformChartData(data, chartType) {
+  if (!data || data.length === 0) return []
+  if (chartType === 'line' || chartType === 'area') {
+    return data.map(d => ({ time: d.time, value: d.close }))
+  }
+  if (chartType === 'heikin-ashi') {
+    return calculateHeikinAshi(data)
+  }
+  return data
+}
+
+function createMainSeries(chart, chartType) {
+  const candleStyle = {
+    upColor: '#26a69a', downColor: '#ef5350',
+    borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+    wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+  }
+  switch (chartType) {
+    case 'bars':
+      return chart.addSeries(BarSeries, {
+        upColor: '#26a69a', downColor: '#ef5350', thinBars: false,
+      })
+    case 'line':
+      return chart.addSeries(LineSeries, { color: '#2962ff', lineWidth: 2 })
+    case 'area':
+      return chart.addSeries(AreaSeries, {
+        lineColor: '#2962ff', lineWidth: 2,
+        topColor: 'rgba(41,98,255,0.4)', bottomColor: 'rgba(41,98,255,0.01)',
+      })
+    case 'hollow':
+      return chart.addSeries(CandlestickSeries, {
+        ...candleStyle,
+        upColor: 'rgba(0,0,0,0)',
+      })
+    case 'heikin-ashi':
+    case 'candles':
+    default:
+      return chart.addSeries(CandlestickSeries, candleStyle)
+  }
 }
 
 function baseOptions(el) {
@@ -95,7 +151,7 @@ function IndicatorChart({ containerRef, data, seriesType, color, onChartReady, p
   return null
 }
 
-export default function ChartContainer({ symbol, timeframe, indicators, ordersTrigger = 0 }) {
+export default function ChartContainer({ symbol, timeframe, indicators, ordersTrigger = 0, chartType = 'candles' }) {
   const chartAreaRef = useRef(null)
   const rsiAreaRef = useRef(null)
   const macdAreaRef = useRef(null)
@@ -131,13 +187,7 @@ export default function ChartContainer({ symbol, timeframe, indicators, ordersTr
     const w = el.clientWidth || 1
     const h = el.clientHeight || 1
     const chart = createChart(el, { ...baseOptions(el), width: w, height: h })
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#26a69a', downColor: '#ef5350',
-      borderUpColor: '#26a69a', borderDownColor: '#ef5350',
-      wickUpColor: '#26a69a', wickDownColor: '#ef5350',
-    })
     chartRef.current = chart
-    candleSeriesRef.current = series
 
     const bloquearPinchZoomMovil = (e) => {
       if (e.touches && e.touches.length > 1) {
@@ -163,8 +213,30 @@ export default function ChartContainer({ symbol, timeframe, indicators, ordersTr
       el.removeEventListener('touchmove', bloquearPinchZoomMovil)
       ro.disconnect()
       chart.remove()
+      candleSeriesRef.current = null
     }
   }, [loadMore])
+
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+
+    if (candleSeriesRef.current) {
+      try { chart.removeSeries(candleSeriesRef.current) } catch {}
+      candleSeriesRef.current = null
+      orderLinesRef.current = []
+    }
+
+    const series = createMainSeries(chart, chartType)
+    candleSeriesRef.current = series
+
+    if (allDataRef.current.length > 0) {
+      const fmt = getPriceFormat(allDataRef.current.at(-1)?.close)
+      series.applyOptions({ priceFormat: { type: 'price', ...fmt } })
+      series.setData(transformChartData(allDataRef.current, chartType))
+      chart.timeScale().fitContent()
+    }
+  }, [chartType])
 
   useEffect(() => {
     if (!symbol) return
@@ -232,7 +304,7 @@ export default function ChartContainer({ symbol, timeframe, indicators, ordersTr
         orderLinesRef.current.push(tpLine)
       }
     })
-  }, [symbolOrders, data])
+  }, [symbolOrders, data, chartType])
 
   useEffect(() => {
     if (!candleSeriesRef.current) return
@@ -249,18 +321,20 @@ export default function ChartContainer({ symbol, timeframe, indicators, ordersTr
     const fmt = getPriceFormat(data.at(-1)?.close)
     series.applyOptions({ priceFormat: { type: 'price', ...fmt } })
 
+    const transformed = transformChartData(data, chartType)
+
     if (prevLen === 0 || data.length <= prevLen) {
-      series.setData(data)
+      series.setData(transformed)
       chart?.timeScale().fitContent()
     } else {
       const added = data.length - prevLen
       const vr = chart?.timeScale().getVisibleLogicalRange()
-      series.setData(data)
+      series.setData(transformed)
       if (vr && chart) {
         chart.timeScale().setVisibleLogicalRange({ from: vr.from + added, to: vr.to + added })
       }
     }
-  }, [data])
+  }, [data, chartType])
 
   useEffect(() => {
     const chart = chartRef.current
@@ -328,11 +402,28 @@ export default function ChartContainer({ symbol, timeframe, indicators, ordersTr
     const id = setInterval(async () => {
       try {
         const candle = await fetchLatestCandle(symbol, timeframe)
-        if (candle) candleSeriesRef.current?.update(candle)
+        if (!candle) return
+        const series = candleSeriesRef.current
+        if (!series) return
+        if (chartType === 'line' || chartType === 'area') {
+          series.update({ time: candle.time, value: candle.close })
+        } else if (chartType === 'heikin-ashi') {
+          const arr = allDataRef.current
+          if (arr.length === 0) { series.update(candle); return }
+          const lastTime = arr.at(-1).time
+          let merged
+          if (candle.time === lastTime) merged = arr.slice(0, -1).concat([candle])
+          else if (candle.time > lastTime) merged = arr.concat([candle])
+          else return
+          allDataRef.current = merged
+          series.setData(calculateHeikinAshi(merged))
+        } else {
+          series.update(candle)
+        }
       } catch (_) {}
     }, 10000)
     return () => clearInterval(id)
-  }, [symbol, timeframe])
+  }, [symbol, timeframe, chartType])
 
   const unsubsRef = useRef([])
 

@@ -63,14 +63,11 @@ export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
     throw new Error('Interval debe ser una cadena válida');
   }
 
-  if (!isCrypto(symbol)) {
-    console.warn(`Datos históricos no disponibles para ${symbol} (solo cryptos soportados)`);
-    return [];
-  }
-
   try {
     const normalizedInterval = interval.toLowerCase();
-    const url = `${API_BASE}/proxy/binance/klines/${symbol}?interval=${normalizedInterval}&limit=${Math.min(Math.max(limit, 1), 1000)}`;
+    const safeLimit = Math.min(Math.max(limit, 1), 1000);
+    const provider = isCrypto(symbol) ? 'binance' : 'yahoo';
+    const url = `${API_BASE}/proxy/${provider}/klines/${symbol}?interval=${normalizedInterval}&limit=${safeLimit}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -99,10 +96,6 @@ export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100, befor
     throw new Error('Symbol debe ser una cadena válida');
   }
 
-  if (!isCrypto(symbol)) {
-    return [];
-  }
-
   try {
     const params = new URLSearchParams({
       interval: (interval || '1d').toLowerCase(),
@@ -113,7 +106,8 @@ export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100, befor
       params.append('before', beforeTime);
     }
 
-    const url = `${API_BASE}/proxy/binance/klines/${symbol}?${params}`;
+    const provider = isCrypto(symbol) ? 'binance' : 'yahoo';
+    const url = `${API_BASE}/proxy/${provider}/klines/${symbol}?${params}`;
     const response = await fetch(url);
 
     if (!response.ok) {

@@ -54,7 +54,8 @@ async def binance_ticker(symbol: str):
             result = {
                 "symbol": symbol.upper(),
                 "price": float(data.get("lastPrice", 0)),
-                "change": float(data.get("priceChangePercent", 0)),
+                "change": float(data.get("priceChange", 0)),
+                "changePercent": float(data.get("priceChangePercent", 0)),
                 "high": float(data.get("highPrice", 0)),
                 "low": float(data.get("lowPrice", 0)),
                 "volume": float(data.get("volume", 0)),
@@ -101,6 +102,86 @@ async def binance_klines(
                 ]
             }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+YAHOO_BASE = "https://query1.finance.yahoo.com"
+
+INTERVAL_MAP = {
+    "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+    "1h": "60m", "4h": "60m",
+    "1d": "1d", "1w": "1wk", "1mo": "1mo",
+}
+
+@proxy_router.get("/yahoo/klines/{symbol}")
+async def yahoo_klines(
+    symbol: str,
+    interval: str = Query("1d"),
+    limit: int = Query(100, le=1000)
+):
+    symbol_upper = symbol.upper()
+    iv = interval.lower()
+    cache_key = f"yahoo_klines_{symbol_upper}_{iv}_{limit}"
+    now = time.time()
+
+    cached = _cache.get(cache_key)
+    if cached and (now - cached["time"]) < CACHE_TTL:
+        return cached["data"]
+
+    yahoo_interval = INTERVAL_MAP.get(iv, "1d")
+    if yahoo_interval in ("1m", "5m", "15m", "30m", "60m"):
+        yahoo_range = "1mo"
+    elif yahoo_interval == "1d":
+        yahoo_range = "1y"
+    elif yahoo_interval == "1wk":
+        yahoo_range = "5y"
+    else:
+        yahoo_range = "10y"
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"{YAHOO_BASE}/v8/finance/chart/{symbol_upper}"
+            resp = await client.get(url, params={
+                "interval": yahoo_interval,
+                "range": yahoo_range,
+            }, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            data = resp.json()
+
+            chart = data.get("chart", {})
+            result_list = chart.get("result") or []
+            if not result_list:
+                raise HTTPException(status_code=404, detail="No data")
+            r = result_list[0]
+            timestamps = r.get("timestamp") or []
+            quote = (r.get("indicators", {}).get("quote") or [{}])[0]
+            opens = quote.get("open") or []
+            highs = quote.get("high") or []
+            lows = quote.get("low") or []
+            closes = quote.get("close") or []
+            volumes = quote.get("volume") or []
+
+            candles = []
+            for i, ts in enumerate(timestamps):
+                if i >= len(closes) or closes[i] is None:
+                    continue
+                candles.append({
+                    "time": ts * 1000,
+                    "open": float(opens[i] or 0),
+                    "high": float(highs[i] or 0),
+                    "low": float(lows[i] or 0),
+                    "close": float(closes[i] or 0),
+                    "volume": float(volumes[i] or 0),
+                })
+
+            candles = candles[-limit:]
+            result = {"symbol": symbol_upper, "interval": iv, "candles": candles}
+            _cache[cache_key] = {"data": result, "time": now}
+            return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        if cached:
+            return cached["data"]
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @proxy_router.get("/finnhub/quote/{symbol}")

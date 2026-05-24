@@ -81,10 +81,26 @@ function baseOptions(el) {
     height: el.clientHeight,
     layout: { background: { color: '#131722' }, textColor: '#d1d4dc', attributionLogo: false },
     grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
-    localization: { locale: 'es-ES' },
+    localization: {
+      locale: 'es-ES',
+      timeFormatter: (t) => new Date(t * 1000).toLocaleString('es-ES', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      }),
+    },
     crosshair: { mode: 0 },
     rightPriceScale: { borderColor: '#2a2e39' },
-    timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, lockVisibleTimeRangeOnResize: true },
+    timeScale: {
+      borderColor: '#2a2e39', timeVisible: true, secondsVisible: false, lockVisibleTimeRangeOnResize: true,
+      tickMarkFormatter: (t, tickType) => {
+        const d = new Date(t * 1000)
+        switch (tickType) {
+          case 0: return d.toLocaleDateString('es-ES', { year: 'numeric' })
+          case 1: return d.toLocaleDateString('es-ES', { month: 'short' })
+          case 2: return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })
+          default: return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        }
+      },
+    },
   }
 }
 

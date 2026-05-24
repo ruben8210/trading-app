@@ -6,6 +6,7 @@ import Toolbar from './components/Toolbar/Toolbar'
 import AssetInfo from './components/Sidebar/AssetInfo'
 import Watchlist from './components/Sidebar/Watchlist'
 import IndicatorPanel from './components/Indicators/IndicatorPanel'
+import PortfolioPanel from './components/Portfolio/PortfolioPanel'
 import Login from './components/Login'
 import Admin from './pages/Admin'
 
@@ -18,6 +19,7 @@ function AppContent({ user, onLogout }) {
     bollinger: false, sr: false,
   })
   const [indicatorPanelOpen, setIndicatorPanelOpen] = useState(false)
+  const [portfolioOpen, setPortfolioOpen] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
 
   const handleIndicatorToggle = (key) => {
@@ -50,6 +52,10 @@ function AppContent({ user, onLogout }) {
         </Link>
         <AssetInfo symbol={symbol} />
         <div className="flex items-center gap-4 ml-auto">
+          <button onClick={() => setPortfolioOpen(true)} title="Portfolio"
+            className="text-xs text-text/70 hover:text-accent font-medium transition px-3 py-1.5 rounded hover:bg-accent/10">
+            💼 Portfolio
+          </button>
           <button onClick={toggleFullscreen} title="Pantalla completa"
             className="text-text/60 hover:text-accent text-lg px-2 transition duration-200">⛶</button>
           {user?.role === 'admin' && location.pathname !== '/admin' && (
@@ -101,6 +107,8 @@ function AppContent({ user, onLogout }) {
           onClose={() => setIndicatorPanelOpen(false)}
         />
       )}
+
+      <PortfolioPanel open={portfolioOpen} onClose={() => setPortfolioOpen(false)} />
     </div>
   )
 }

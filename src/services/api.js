@@ -6,6 +6,10 @@ const handleFetchError = (error, context) => {
   throw new Error(`${context}: ${message}`);
 };
 
+// lightweight-charts expects UNIX timestamps in seconds; APIs return milliseconds
+const toSeconds = (t) => (t > 1e11 ? Math.floor(t / 1000) : t);
+const normalizeCandle = (c) => ({ ...c, time: toSeconds(c.time) });
+
 export const isCrypto = (symbol) => {
   return symbol.toUpperCase().endsWith("USDT") || ["BTC", "ETH"].includes(symbol.toUpperCase());
 };
@@ -77,7 +81,7 @@ export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
       return [];
     }
 
-    return data.candles;
+    return data.candles.map(normalizeCandle);
   } catch (error) {
     handleFetchError(error, `Error al obtener barras para ${symbol}`);
   }
@@ -116,7 +120,7 @@ export const fetchMoreOHLCV = async (symbol, interval = "1d", limit = 100, befor
       return [];
     }
 
-    return data.candles;
+    return data.candles.map(normalizeCandle);
   } catch (error) {
     handleFetchError(error, `Error al obtener más datos para ${symbol}`);
   }

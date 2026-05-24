@@ -60,7 +60,8 @@ export const fetchBars = async (symbol, interval = "1d", limit = 100) => {
   }
 
   try {
-    const url = `${API_BASE}/proxy/binance/klines/${symbol}?interval=${interval}&limit=${Math.min(Math.max(limit, 1), 1000)}`;
+    const normalizedInterval = interval.toLowerCase();
+    const url = `${API_BASE}/proxy/binance/klines/${symbol}?interval=${normalizedInterval}&limit=${Math.min(Math.max(limit, 1), 1000)}`;
     const response = await fetch(url);
 
     if (!response.ok) {

@@ -174,12 +174,12 @@ async def yahoo_klines(
                 raise HTTPException(status_code=404, detail="No data")
             r = result_list[0]
             timestamps = r.get("timestamp") or []
-            quote = (r.get("indicators", {}).get("quote") or [{}])[0]
-            opens = quote.get("open") or []
-            highs = quote.get("high") or []
-            lows = quote.get("low") or []
-            closes = quote.get("close") or []
-            volumes = quote.get("volume") or []
+            q_data = (r.get("indicators", {}).get("quote") or [{}])[0]
+            opens = q_data.get("open") or []
+            highs = q_data.get("high") or []
+            lows = q_data.get("low") or []
+            closes = q_data.get("close") or []
+            volumes = q_data.get("volume") or []
 
             candles = []
             for i, ts in enumerate(timestamps):

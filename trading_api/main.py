@@ -112,6 +112,20 @@ async def finnhub_quote(symbol: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
+@app.post("/api/v1/auth/login", response_model=TokenResponse)
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == request.username).first()
+    if not user or not verify_password(request.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    access_token = create_access_token({"sub": str(user.id)})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/api/v1/auth/me", response_model=UserMe)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return UserMe(id=current_user.id, username=current_user.username, role=current_user.role)
+
+
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(preferences.router, prefix="/api/v1")
 app.include_router(stocks.router, prefix="/api/v1")

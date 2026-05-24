@@ -1,4 +1,5 @@
 import os
+import time
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, APIRouter, Query
@@ -29,8 +30,18 @@ BINANCE_BASE = "https://api.binance.com"
 FINNHUB_BASE = "https://finnhub.io/api/v1"
 FINNHUB_KEY = "d87ckf1r01ql0hsl7uigd87ckf1r01ql0hsl7uj0"
 
+_cache = {}
+CACHE_TTL = 15
+
 @proxy_router.get("/binance/ticker/{symbol}")
 async def binance_ticker(symbol: str):
+    cache_key = f"binance_ticker_{symbol.upper()}"
+    now = time.time()
+
+    cached = _cache.get(cache_key)
+    if cached and (now - cached["time"]) < CACHE_TTL:
+        return cached["data"]
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             ticker_symbol = symbol.upper()
@@ -40,7 +51,7 @@ async def binance_ticker(symbol: str):
             resp = await client.get(url, params={"symbol": ticker_symbol})
             resp.raise_for_status()
             data = resp.json()
-            return {
+            result = {
                 "symbol": symbol.upper(),
                 "price": float(data.get("lastPrice", 0)),
                 "change": float(data.get("priceChangePercent", 0)),
@@ -48,7 +59,11 @@ async def binance_ticker(symbol: str):
                 "low": float(data.get("lowPrice", 0)),
                 "volume": float(data.get("volume", 0)),
             }
+            _cache[cache_key] = {"data": result, "time": now}
+            return result
     except Exception as e:
+        if cached:
+            return cached["data"]
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @proxy_router.get("/binance/klines/{symbol}")
@@ -90,17 +105,25 @@ async def binance_klines(
 
 @proxy_router.get("/finnhub/quote/{symbol}")
 async def finnhub_quote(symbol: str):
+    symbol_upper = symbol.upper()
+    cache_key = f"finnhub_quote_{symbol_upper}"
+    now = time.time()
+
+    cached = _cache.get(cache_key)
+    if cached and (now - cached["time"]) < CACHE_TTL:
+        return cached["data"]
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             url = f"{FINNHUB_BASE}/quote"
             resp = await client.get(url, params={
-                "symbol": symbol.upper(),
+                "symbol": symbol_upper,
                 "token": FINNHUB_KEY
             })
             resp.raise_for_status()
             data = resp.json()
-            return {
-                "symbol": symbol.upper(),
+            result = {
+                "symbol": symbol_upper,
                 "price": float(data.get("c", 0)),
                 "change": float(data.get("d", 0)),
                 "changePercent": float(data.get("dp", 0)),
@@ -109,7 +132,11 @@ async def finnhub_quote(symbol: str):
                 "open": float(data.get("o", 0)),
                 "volume": float(data.get("v", 0)),
             }
+            _cache[cache_key] = {"data": result, "time": now}
+            return result
     except Exception as e:
+        if cached:
+            return cached["data"]
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse)

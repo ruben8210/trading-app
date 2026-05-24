@@ -65,7 +65,7 @@ async def binance_klines(
             url = f"{BINANCE_BASE}/api/v3/klines"
             resp = await client.get(url, params={
                 "symbol": ticker_symbol,
-                "interval": interval,
+                "interval": interval.lower(),
                 "limit": limit
             })
             resp.raise_for_status()

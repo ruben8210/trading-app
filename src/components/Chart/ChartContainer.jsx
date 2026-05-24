@@ -23,7 +23,7 @@ function baseOptions(el) {
   return {
     width: el.clientWidth,
     height: el.clientHeight,
-    layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+    layout: { background: { color: '#131722' }, textColor: '#d1d4dc', attributionLogo: false },
     grid: { vertLines: { color: '#2a2e39' }, horzLines: { color: '#2a2e39' } },
     localization: { locale: 'es-ES' },
     crosshair: { mode: 0 },
